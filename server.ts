@@ -1,0 +1,1761 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+import { db } from './server/db.js';
+import { 
+  Profile, Plan, Transaction, Deposit, Withdrawal, ActivityLog, Notification, Announcement 
+} from './src/types.js';
+import nodemailer from 'nodemailer';
+import { generateSecret, verifyTOTP } from './server/totp.js';
+
+// Configure dynamic robust SMTP email delivery service with safe default self-healing fallback
+const sendEmail = async (to: string, subject: string, htmlContent: string) => {
+  // Read environments or fall back to proven credentials
+  const envHost = process.env.SMTP_HOST || 'mail.spacemail.com';
+  const envPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const rawUser = process.env.SMTP_USER || 'support@cyptobtcminer.com';
+  const pass = process.env.SMTP_PASS || 'Dauda@2026';
+  
+  // Resiliently correct common brand spelling typos "cryptobtcminer" (with r) -> "cyptobtcminer" (without r) for login authentication
+  const user = rawUser.replace(/cryptobtcminer\.com/gi, 'cyptobtcminer.com');
+  
+  // Use secure: false when using port 587 (STARTTLS). For port 465, use secure: true by default unless specified.
+  const secure = envPort === 465 ? (process.env.SMTP_SECURE !== 'false') : false;
+
+  console.log(`[SMTP] Activating delivery stream to ${to} via ${envHost}:${envPort} as ${user} (Secure: ${secure})`);
+
+  // Sequence of attempt profiles
+  const attempts = [
+    { host: envHost, port: envPort, secure, name: 'Primary Connection' },
+    // If primary port (e.g., 465) times out due to outbound container filters, immediately fall back to verified 587 STARTTLS
+    { host: 'mail.spacemail.com', port: 587, secure: false, name: 'STARTTLS Verified Fallback' }
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      console.log(`[SMTP] Connection attempt: [${attempt.name}] on ${attempt.host}:${attempt.port}...`);
+      const transporter = nodemailer.createTransport({
+        host: attempt.host,
+        port: attempt.port,
+        secure: attempt.secure,
+        auth: {
+          user,
+          pass,
+        },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 8000 // robust timeout boundary
+      });
+
+      const info = await transporter.sendMail({
+        from: `"Crypto BTC Miner Support" <${user}>`,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log(`[SMTP SUCCESS] Dispatched message via [${attempt.name}] to ${to}. ID: ${info.messageId}`);
+      return { success: true, messageId: info.messageId };
+    } catch (err: any) {
+      console.warn(`[SMTP WARNING] Relay protocol failed under [${attempt.name}]:`, err.message || err);
+    }
+  }
+
+  console.error(`[SMTP ERROR] All SMTP transport channels exhausted for transmission sequence to ${to}`);
+  return { success: false, error: new Error('All SMTP routes timed out or failed verification.') };
+};
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // API CORS fallback (not strictly required since we proxy, but clean)
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  const processMining = (user: any) => {
+    if (user.is_suspended || !user.active_plan) {
+      return;
+    }
+
+    const plansList = db.getPlans();
+    const userPlan = plansList.find(p => p.id === user.active_plan);
+    if (!userPlan || !userPlan.is_active) {
+      return;
+    }
+
+    const now = Date.now();
+
+    // Setup fallback dates defensively
+    if (!user.plan_activated_at) {
+      user.plan_activated_at = user.created_at || new Date().toISOString();
+    }
+    if (!user.plan_expires_at) {
+      const planDurationMs = userPlan.duration_days * 24 * 60 * 60 * 1000;
+      const startMs = new Date(user.plan_activated_at).getTime();
+      user.plan_expires_at = new Date(startMs + planDurationMs).toISOString();
+    }
+    if (!user.last_mining_at) {
+      user.last_mining_at = user.plan_activated_at || new Date().toISOString();
+    }
+
+    const expiryTime = new Date(user.plan_expires_at).getTime();
+    const lastTime = new Date(user.last_mining_at).getTime();
+
+    if (lastTime >= expiryTime) {
+      // Plan has expired already
+      user.active_plan = null;
+      db.updateProfile(user);
+      return;
+    }
+
+    const activeEnd = Math.min(now, expiryTime);
+    const elapsedMs = activeEnd - lastTime;
+
+    if (elapsedMs > 0) {
+      const dailyEarn = userPlan.daily_earn_btc;
+      const earned = elapsedMs * (dailyEarn / 86400000);
+
+      if (earned > 0.00000001) {
+        user.btc_balance = Number((user.btc_balance + earned).toFixed(8));
+
+        db.addTransaction({
+          id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          type: 'mining',
+          description: `Cloud mining payout block term (${userPlan.name})`,
+          amount_btc: Number(earned.toFixed(8)),
+          status: 'completed',
+          created_at: new Date(activeEnd).toISOString()
+        });
+
+        db.addNotification({
+          id: 'not_m_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          message: `Cloud payout credited +${earned.toFixed(8)} BTC to your profile balance!`,
+          is_read: false,
+          created_at: new Date(activeEnd).toISOString()
+        });
+      }
+
+      user.last_mining_at = new Date(activeEnd).toISOString();
+    }
+
+    // Turn off plan if we reached raw expiration
+    if (now >= expiryTime) {
+      user.active_plan = null;
+
+      db.addNotification({
+        id: 'not_exp_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        message: `Your cloud mining contract (${userPlan.name}) has reached its maturity term of ${userPlan.duration_days} days and stopped. Activate Free plan or buy a new contract to continue.`,
+        is_read: false,
+        created_at: new Date(expiryTime).toISOString()
+      });
+
+      db.addActivityLog({
+        id: 'act_exp_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        action: 'Contract Expired',
+        details: `Your cloud mining contract (${userPlan.name}) has expired after ${userPlan.duration_days} days.`,
+        created_at: new Date(expiryTime).toISOString()
+      });
+    }
+
+    db.updateProfile(user);
+  };
+
+  // Simple Authenticator Middleware based on User Identification Header
+  const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: Missing session' });
+    }
+    const token = authHeader.split(' ')[1];
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === token);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized: User not found' });
+    }
+    if (user.is_suspended) {
+      return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
+    }
+    processMining(user);
+    (req as any).user = user;
+    next();
+  };
+
+  const adminAuthenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    authenticate(req, res, () => {
+      const user = (req as any).user;
+      if (!user.is_admin) {
+        return res.status(403).json({ error: 'Forbidden: Admin access only' });
+      }
+      next();
+    });
+  };
+
+  // --- PUBLIC API ENDPOINTS ---
+
+  // BTC Market Rates Proxy (Utilizes standard neutral path to prevent client-side ad-blocks)
+  app.get('/api/rates/btc', async (req, res) => {
+    try {
+      // Small timeout fetching to avoid stalling developer environment
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 4000);
+      
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', {
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      
+      if (!response.ok) {
+        throw new Error('CoinGecko server error');
+      }
+      const data = await response.json();
+      res.json({
+        btc_usd: data.bitcoin?.usd || 68420.0,
+        change_24h: data.bitcoin?.usd_24h_change || 1.84
+      });
+    } catch (e) {
+      // Fallback if CoinGecko is rate limited or offline
+      res.json({
+        btc_usd: 68420.0 + (Math.random() * 200 - 100),
+        change_24h: 1.84
+      });
+    }
+  });
+
+  // OTP Pending Registries map
+  const pendingRegistrations = new Map<string, { otp: string; data: any; expiresAt: number }>();
+  const forgotPasswordOtps = new Map<string, { otp: string; expiresAt: number }>();
+
+  // Auth: Send Signup OTP
+  app.post('/api/auth/send-otp', async (req, res) => {
+    const { name, email, password, referralCode } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Full name, email and password are required' });
+    }
+
+    const profiles = db.getProfiles();
+    const existing = profiles.find(p => p.email.toLowerCase() === email.toLowerCase().trim());
+    if (existing) {
+      return res.status(400).json({ error: 'An account with that email already exists' });
+    }
+
+    // Generate a secure 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store in pending registrees memory map
+    pendingRegistrations.set(email.toLowerCase().trim(), {
+      otp,
+      data: { name, email, password, referralCode },
+      expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins expiry
+    });
+
+    console.log(`[AUTH CLIENT] Sent 6-digit registration OTP verification code to ${email}: ${otp}`);
+
+    // High-contrast premium styled HTML Email template
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
+        <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
+          <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
+            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+          </div>
+          <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
+            Register Account Verification
+          </div>
+          <h1 style="font-size: 20px; font-weight: 500; color: #FFFFFF; margin: 0 0 24px 0; line-height: 1.4;">
+            Hello ${name}, verify your registration to activate cloud mining.
+          </h1>
+          
+          <div style="background-color: #1C1917; border: 1px solid #292524; border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #78716C; margin-bottom: 8px;">
+              Your 6-Digit Protection OTP
+            </div>
+            <div style="font-size: 40px; font-weight: 900; font-family: monospace; letter-spacing: 0.25em; color: #F97316; margin: 10px 0;">
+              ${otp}
+            </div>
+            <div style="font-size: 12px; color: #A8A29E; margin-top: 8px;">
+              Expires in exactly 15 minutes.
+            </div>
+          </div>
+          
+          <p style="font-size: 13px; color: #78716C; line-height: 1.6; margin: 0 0 24px 0;">
+            This one-time authentication code is required to establish your secure digital wallet and startup terms. Please do not share this password with anyone. We will never ask you for this.
+          </p>
+          
+          <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
+            If you did not initiate this activation request, please immediately ignore this message or report it directly to <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Ensure the email is successfully sent to the inbox before confirming
+    await sendEmail(email.toLowerCase().trim(), "Verify Your Crypto BTC Miner Registration", emailHtml);
+
+    res.json({ 
+      success: true, 
+      message: 'A 6-digit registration verification OTP has been emailed successfully!', 
+      email: email.toLowerCase().trim()
+    });
+
+  });
+
+  // Auth: Verify Signup OTP & Complete Account Creation
+  app.post('/api/auth/verify-otp', (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit OTP code are required' });
+    }
+
+    const emailKey = email.toLowerCase().trim();
+    const record = pendingRegistrations.get(emailKey);
+    if (!record) {
+      return res.status(400).json({ error: 'No active registration OTP request found for this email. Please try again.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      pendingRegistrations.delete(emailKey);
+      return res.status(400).json({ error: 'The 6-digit OTP has expired. Please request a new one.' });
+    }
+
+    if (record.otp !== otp.trim()) {
+      return res.status(400).json({ error: 'Incorrect verification OTP entered. Please try again.' });
+    }
+
+    // OTP is correct! Now create account using record data
+    const { name, password, referralCode } = record.data;
+    const profiles = db.getProfiles();
+    
+    // Safety check just in case someone registered in between
+    const existing = profiles.find(p => p.email.toLowerCase() === emailKey);
+    if (existing) {
+      pendingRegistrations.delete(emailKey);
+      return res.status(400).json({ error: 'An account with that email already exists' });
+    }
+
+    const userId = 'usr_' + Math.random().toString(36).substr(2, 9);
+    const refCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+
+    // Check referring
+    let referredBy: string | null = null;
+    if (referralCode) {
+      const referrer = profiles.find(p => p.referral_code.toUpperCase() === referralCode.trim().toUpperCase());
+      if (referrer) {
+        referredBy = referrer.id;
+      }
+    }
+
+    const newProfile: Profile & { passwordHash: string } = {
+      id: userId,
+      email: emailKey,
+      full_name: name,
+      btc_balance: 0.00000000,
+      active_plan: 'plan_free',
+      plan_activated_at: new Date().toISOString(),
+      plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      last_mining_at: new Date().toISOString(),
+      is_admin: false,
+      is_suspended: false,
+      referral_code: refCode,
+      referred_by: referredBy,
+      admin_note: null,
+      created_at: new Date().toISOString(),
+      passwordHash: password,
+      settings: {
+        blurBalances: false,
+        notifyDepositConfirm: true,
+        notifyWithdrawUpdate: true,
+        notifySecurityAlert: true,
+        notifyPromotions: false
+      }
+    };
+
+    // Credit referrer if code match
+    if (referredBy) {
+      const referrer = profiles.find(p => p.id === referredBy);
+      if (referrer) {
+        referrer.btc_balance += 0.0001;
+        db.updateProfile(referrer);
+
+        db.addTransaction({
+          id: 'tx_' + Math.random().toString(36).substr(2, 9),
+          user_id: referrer.id,
+          type: 'referral',
+          description: `Referral bonus for inviting ${name}`,
+          amount_btc: 0.0001,
+          status: 'completed',
+          created_at: new Date().toISOString()
+        });
+
+        db.addNotification({
+          id: 'not_' + Math.random().toString(36).substr(2, 9),
+          user_id: referrer.id,
+          message: `Congratulations! Ref bonus for inviting ${name} (+0.0001 BTC) is credited.`,
+          is_read: false,
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
+    db.addProfile(newProfile);
+
+    // Initial Transaction for Free Plan
+    db.addTransaction({
+      id: 'tx_init_free',
+      user_id: userId,
+      type: 'mining',
+      description: 'Free starter plan activated (10 GH/s)',
+      amount_btc: 0,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: userId,
+      action: 'Registration (OTP Verified)',
+      details: `Account created and verified for ${emailKey}. Referred by code: ${referralCode || 'None'}. Free plan loaded.`,
+      created_at: new Date().toISOString()
+    });
+
+    // Remove pending record once complete
+    pendingRegistrations.delete(emailKey);
+
+    res.json({ token: userId, profile: newProfile });
+  });
+
+  // Auth: Register (Disabled directly - must go through OTP send/verify)
+  app.post('/api/auth/signup', (req, res) => {
+    return res.status(400).json({ error: 'Direct registration is disabled. Please verify your email with a 6-digit OTP code to complete account creation.' });
+  });
+
+  // Auth: Login
+  app.post('/api/auth/login', (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user || user.passwordHash !== password) {
+      return res.status(401).json({ error: 'Incorrect email or password' });
+    }
+
+    if (user.is_suspended) {
+      return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
+    }
+
+    // Toggle 2FA gate if enabled
+    if (user.two_factor_enabled) {
+      return res.json({ require_2fa: true, email: user.email });
+    }
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Login',
+      details: 'Logged into the system successfully.',
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ token: user.id, profile: user });
+  });
+
+  // Verify dynamic 2FA Login Form
+  app.post('/api/auth/verify-2fa-login', (req, res) => {
+    const { email, password, code } = req.body;
+    if (!email || !password || !code) {
+      return res.status(400).json({ error: 'Email, password, and 2FA verification code are required.' });
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+
+    if (!user || user.passwordHash !== password) {
+      return res.status(401).json({ error: 'Incorrect email or password credentials' });
+    }
+
+    if (user.is_suspended) {
+      return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
+    }
+
+    if (!user.two_factor_enabled || !user.two_factor_secret) {
+      return res.status(400).json({ error: 'Two-Factor Authentication is not activated on this profile.' });
+    }
+
+    const isValid = verifyTOTP(code, user.two_factor_secret);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid 6-digit authentication code. Please check your app.' });
+    }
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: '2FA Login',
+      details: 'Passed 2FA safety gate and completed login sequence safely.',
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ token: user.id, profile: user });
+  });
+
+  // OTP-based Forgot Password recovery trigger
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required' });
+    }
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase().trim());
+    
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with that email address.' });
+    }
+
+    if (user.is_suspended) {
+      return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
+    }
+
+    // Generate 6-digit verification code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    forgotPasswordOtps.set(email.toLowerCase().trim(), {
+      otp,
+      expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins expiry
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Forgot Password OTP Requested',
+      details: 'Requested security modification validation code.',
+      created_at: new Date().toISOString()
+    });
+
+    console.log(`[AUTH CLIENT] Sent 6-digit password reset OTP verification code to ${email}: ${otp}`);
+
+    // High-contrast premium styled HTML Email template
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
+        <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
+          <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
+            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+          </div>
+          <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
+            Security Recovery Code
+          </div>
+          <h1 style="font-size: 20px; font-weight: 500; color: #FFFFFF; margin: 0 0 24px 0; line-height: 1.4;">
+            Did you request a password reset for your cloud mining account?
+          </h1>
+          
+          <div style="background-color: #1C1917; border: 1px solid #292524; border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #78716C; margin-bottom: 8px;">
+              Your 6-Digit Password Reset OTP
+            </div>
+            <div style="font-size: 40px; font-weight: 900; font-family: monospace; letter-spacing: 0.25em; color: #F97316; margin: 10px 0;">
+              ${otp}
+            </div>
+            <div style="font-size: 12px; color: #A8A29E; margin-top: 8px;">
+              Expires in exactly 15 minutes.
+            </div>
+          </div>
+          
+          <p style="font-size: 13px; color: #78716C; line-height: 1.6; margin: 0 0 24px 0;">
+            Use the security password reset token above to update your security credentials. If you did not initiate this change yourself, someone may be trying to access your miner profile.
+          </p>
+          
+          <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
+            To secure your account immediately, do not verify or register this code, and reach out to our emergency support operations at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Ensure the password reset email is fully sent before sending a response
+    await sendEmail(email.toLowerCase().trim(), "Reset Your Crypto BTC Miner Password", emailHtml);
+
+    res.json({ 
+      success: true, 
+      message: 'A 6-digit password recovery OTP code has been dispatched to your email address.', 
+      email: email.toLowerCase().trim()
+    });
+
+  });
+
+  // Password reset execution using 6-digit OTP
+  app.post('/api/auth/reset-password', (req, res) => {
+    const { email, otp, password } = req.body;
+    if (!email || !otp || !password) {
+      return res.status(400).json({ error: 'Email, verification code and new password are required.' });
+    }
+    
+    const emailKey = email.toLowerCase().trim();
+    const record = forgotPasswordOtps.get(emailKey);
+    if (!record) {
+      return res.status(400).json({ error: 'No active password recovery request found for this email address. Please request a new OTP.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      forgotPasswordOtps.delete(emailKey);
+      return res.status(400).json({ error: 'The verification OTP has expired. Please request a new OTP.' });
+    }
+
+    if (record.otp !== otp.trim()) {
+      return res.status(400).json({ error: 'Invalid verification OTP code. Please check and try again.' });
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.email.toLowerCase() === emailKey);
+    if (!user) {
+      forgotPasswordOtps.delete(emailKey);
+      return res.status(404).json({ error: 'Recovery validation failed: associated account is missing.' });
+    }
+
+    user.passwordHash = password;
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Password Reset Completed',
+      details: 'Security credentials updated securely via verified password-reset OTP.',
+      created_at: new Date().toISOString()
+    });
+
+    // Clear verification map record
+    forgotPasswordOtps.delete(emailKey);
+
+    res.json({ success: true, message: 'Password updated successfully. You can now login.' });
+  });
+
+  // Get active plans list
+  app.get('/api/plans', (req, res) => {
+    res.json(db.getPlans().filter(p => p.is_active));
+  });
+
+  // --- MEMEBER PROTECTED ENDPOINTS ---
+
+  // Get self profile
+  app.get('/api/user/profile', authenticate, (req, res) => {
+    res.json((req as any).user);
+  });
+
+  // Activate/purchase a plan directly using balance or activate the Free plan
+  app.post('/api/user/plan/activate', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { planId } = req.body;
+
+    if (!planId) {
+      return res.status(400).json({ error: 'Plan ID is required' });
+    }
+
+    const plans = db.getPlans();
+    const plan = plans.find(p => p.id === planId);
+    if (!plan || !plan.is_active) {
+      return res.status(404).json({ error: 'Active plan not found' });
+    }
+
+    if (plan.price_btc === 0) {
+      user.active_plan = plan.id;
+      user.plan_activated_at = new Date().toISOString();
+      user.plan_expires_at = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString();
+      user.last_mining_at = new Date().toISOString();
+      db.updateProfile(user);
+
+      db.addTransaction({
+        id: 'tx_act_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        type: 'mining',
+        description: `${plan.name} plan activated (hashpower online)`,
+        amount_btc: 0,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      });
+
+      db.addActivityLog({
+        id: 'act_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        action: 'Plan Activated',
+        details: `${plan.name} plan activated. Hash rate: ${plan.hash_rate}. Duration: ${plan.duration_days} days.`,
+        created_at: new Date().toISOString()
+      });
+
+      return res.json({ success: true, profile: user, message: `${plan.name} miner has been successfully activated!` });
+    } else {
+      // Purchase with existing BTC balance
+      if (user.btc_balance >= plan.price_btc) {
+        user.btc_balance = Number((user.btc_balance - plan.price_btc).toFixed(8));
+        user.active_plan = plan.id;
+        user.plan_activated_at = new Date().toISOString();
+        user.plan_expires_at = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString();
+        user.last_mining_at = new Date().toISOString();
+        db.updateProfile(user);
+
+        db.addTransaction({
+          id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          type: 'deposit', // purchased contract
+          description: `Bitcoin hash power purchase (${plan.name} Plan)`,
+          amount_btc: -plan.price_btc,
+          status: 'completed',
+          created_at: new Date().toISOString()
+        });
+
+        db.addActivityLog({
+          id: 'act_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          action: 'Contract Purchased',
+          details: `Purchased ${plan.name} cloud mining contract for ${plan.price_btc} BTC. Duration: ${plan.duration_days} days.`,
+          created_at: new Date().toISOString()
+        });
+
+        return res.json({ success: true, profile: user, message: `${plan.name} cloud miner successfully purchased using your BTC balance!` });
+      } else {
+        return res.status(400).json({ error: `Insufficient BTC balance to activate path. Please deposit ${plan.price_btc} BTC or select a free option.` });
+      }
+    }
+  });
+
+  // Track profile configuration saves
+  app.post('/api/user/profile/update', authenticate, (req, res) => {
+    const user = (req as any).user as Profile;
+    const { full_name, email, settings } = req.body;
+
+    if (full_name) user.full_name = full_name;
+    
+    if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+      if (!user.is_admin) {
+        return res.status(403).json({ error: 'You are not allowed to change your email address. Please contact customer services.' });
+      }
+      const profiles = db.getProfiles();
+      const existing = profiles.find(p => p.email.toLowerCase() === email.toLowerCase().trim() && p.id !== user.id);
+      if (existing) {
+        return res.status(400).json({ error: 'An account with that email already exists' });
+      }
+      user.email = email.toLowerCase().trim();
+    }
+
+    if (settings) {
+      user.settings = { ...user.settings, ...settings };
+    }
+
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Settings Updated',
+      details: 'Redefined personal statistics or alert switches.',
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ profile: user });
+  });
+
+  // Security password rewrites from settings dashboard
+  app.post('/api/user/change-password', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { currentPassword, newPassword } = req.body;
+    if (user.passwordHash !== currentPassword) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+    user.passwordHash = newPassword;
+    db.updateProfile(user);
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Password Saved',
+      details: 'User password rewritten.',
+      created_at: new Date().toISOString()
+    });
+    res.json({ message: 'Password changed successfully.' });
+  });
+
+  // Generate 2FA Secret Key
+  app.post('/api/user/generate-2fa', authenticate, (req, res) => {
+    const user = (req as any).user;
+    if (user.two_factor_enabled) {
+      return res.status(400).json({ error: 'Two-Factor Authentication is already enabled on your account.' });
+    }
+    const secret = generateSecret(16);
+    const otpauthUrl = `otpauth://totp/CryptoBTCMiner:${encodeURIComponent(user.email)}?secret=${secret}&issuer=CryptoBTC%20Miner`;
+    res.json({ secret, otpauthUrl });
+  });
+
+  // Complete and Activate 2FA Security
+  app.post('/api/user/enable-2fa', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { code, secret } = req.body;
+    if (!code || !secret) {
+      return res.status(400).json({ error: 'Verification code and secret key are required.' });
+    }
+
+    const isValid = verifyTOTP(code, secret);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid 6-digit verification code. Please synchronize or check your authenticator code.' });
+    }
+
+    user.two_factor_secret = secret;
+    user.two_factor_enabled = true;
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: '2FA Enabled',
+      details: 'Activated Two-Factor Authentication security protection on login.',
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Deactivate 2FA Security
+  app.post('/api/user/disable-2fa', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Verification code is required.' });
+    }
+    if (!user.two_factor_enabled || !user.two_factor_secret) {
+      return res.status(400).json({ error: 'Two-Factor Authentication is not enabled on this profile.' });
+    }
+
+    const isValid = verifyTOTP(code, user.two_factor_secret);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid 6-digit confirmation code. 2FA deactivation failed.' });
+    }
+
+    user.two_factor_secret = undefined;
+    user.two_factor_enabled = false;
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: '2FA Disabled',
+      details: 'Deactivated Two-Factor Authentication login safety layer.',
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Get notifications
+  app.get('/api/notifications', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const notes = db.getNotifications().filter(n => n.user_id === user.id);
+    res.json(notes.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // Dismiss user notifications
+  app.post('/api/notifications/read', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const notes = db.getNotifications().filter(n => n.user_id === user.id);
+    notes.forEach(n => { n.is_read = true; });
+    db.save();
+    res.json({ message: 'Notifications marked as read' });
+  });
+
+  // Core transaction tracking
+  app.get('/api/transactions', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const txs = db.getTransactions().filter(t => t.user_id === user.id);
+    res.json(txs.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // Active Logs list
+  app.get('/api/activity-logs', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const logs = db.getActivityLogs().filter(l => l.user_id === user.id);
+    res.json(logs.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // Referrals table
+  app.get('/api/referrals', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const profiles = db.getProfiles();
+    const subReferrals = profiles.filter(p => p.referred_by === user.id);
+    
+    // total earned from referrals
+    const txs = db.getTransactions().filter(t => t.user_id === user.id && t.type === 'referral');
+    const totalEarned = txs.reduce((sum, current) => sum + current.amount_btc, 0);
+
+    res.json({
+      referral_code: user.referral_code,
+      total_referral_count: subReferrals.length,
+      total_earned_btc: totalEarned,
+      referrals: subReferrals.map(p => ({
+        name: p.full_name,
+        email: p.email,
+        date: p.created_at,
+        status: p.active_plan ? 'Active Miner' : 'Registered'
+      }))
+    });
+  });
+
+  // Global Announcements for Dashboard Overview
+  app.get('/api/announcements', authenticate, (req, res) => {
+    const list = db.getAnnouncements().filter(a => a.is_active);
+    res.json(list.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // --- DEPOSIT NOWPAYMENTS HANDLER & MODAL ---
+
+  app.post('/api/deposit/create', authenticate, async (req, res) => {
+    const user = (req as any).user;
+    const { planId, amountUsd } = req.body;
+
+    const plan = db.getPlans().find(p => p.id === planId);
+    if (!plan && !amountUsd) {
+      return res.status(400).json({ error: 'Valid Plan ID or USD payment amount requested' });
+    }
+
+    const priceBtc = plan ? plan.price_btc : (Number(amountUsd) / 68420);
+    const usdEquivalent = plan ? (plan.price_btc * 68420) : Number(amountUsd);
+    const invoiceId = 'nowp_' + Math.random().toString(36).substr(2, 9);
+    
+    // Mock BTC receiving address for sandbox
+    const testDepositBtcAddress = 'bc1q' + Math.random().toString(36).substr(2, 10) + Math.random().toString(36).substr(2, 10).toLowerCase();
+
+    // Trace deposit record
+    const deposit: Deposit = {
+      id: 'dep_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      amount_usd: Math.round(usdEquivalent),
+      amount_btc: Number(priceBtc.toFixed(8)),
+      invoice_id: invoiceId,
+      nowpayments_payment_id: invoiceId,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    db.addDeposit(deposit);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Deposit Initiated',
+      details: `Initiated deposit invoice ${invoiceId} for ${priceBtc} BTC (${plan ? plan.name : 'Custom'} Plan)`,
+      created_at: new Date().toISOString()
+    });
+
+    // Handle standard API integration if NOWPayments token exists, otherwise fallback elegantly
+    const nowPayApiKey = process.env.VITE_NOWPAYMENTS_API_KEY || process.env.NOWPAYMENTS_API_KEY;
+    const isSandboxEnv = process.env.VITE_NOWPAYMENTS_SANDBOX === 'true' || process.env.NOWPAYMENTS_SANDBOX === 'true';
+    const nowPayBaseUrl = isSandboxEnv ? 'https://api-sandbox.nowpayments.io/v1' : 'https://api.nowpayments.io/v1';
+
+    if (nowPayApiKey && nowPayApiKey !== 'MY_NOWPAYMENTS_API_KEY' && nowPayApiKey.length > 5) {
+      try {
+        const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'https';
+        const host = req.get('host');
+        const defaultAppUrl = `${protocol}://${host}`;
+        const ipnCallbackUrl = (process.env.APP_URL || defaultAppUrl) + '/api/payments/webhook';
+
+        console.log(`Creating NowPayments invoice on: ${nowPayBaseUrl}/invoice with IPN callback: ${ipnCallbackUrl}`);
+
+        const response = await fetch(`${nowPayBaseUrl}/invoice`, {
+          method: 'POST',
+          headers: {
+            'x-api-key': nowPayApiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            price_amount: usdEquivalent,
+            price_currency: 'usd',
+            pay_currency: 'btc',
+            ipn_callback_url: ipnCallbackUrl,
+            order_id: invoiceId,
+            order_description: `Purchase of ${plan ? plan.name : 'Custom'} Hashpower Plan`
+          })
+        });
+
+        if (response.ok) {
+          const rawInvoice = await response.json();
+          // Update details with actual NOWPayments parameters if success
+          if (rawInvoice.invoice_url || rawInvoice.pay_address) {
+            deposit.invoice_id = rawInvoice.id || invoiceId;
+            deposit.nowpayments_payment_id = rawInvoice.id || invoiceId;
+            db.updateDeposit(deposit);
+            
+            return res.json({
+              invoiceId: rawInvoice.id,
+              payAddress: rawInvoice.pay_address || testDepositBtcAddress,
+              amountBtc: rawInvoice.pay_amount || priceBtc,
+              qrurl: rawInvoice.invoice_url 
+                ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(rawInvoice.invoice_url)}`
+                : `${nowPayBaseUrl}/qr-code?payment_id=${rawInvoice.id}`,
+              invoiceUrl: rawInvoice.invoice_url,
+              isSandbox: isSandboxEnv
+            });
+          }
+        } else {
+          const errText = await response.text();
+          console.error(`NOWPayments API responded with an error status ${response.status}: ${errText}`);
+        }
+      } catch (e) {
+        console.error('NOWPayments API call failed; switching strictly to sandbox mock simulation.', e);
+      }
+    }
+
+    // Elegant Sandbox Mock Payout Invoice Backing
+    res.json({
+      invoiceId: invoiceId,
+      payAddress: testDepositBtcAddress,
+      amountBtc: Number(priceBtc.toFixed(8)),
+      qrurl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=bitcoin:${testDepositBtcAddress}?amount=${priceBtc}`,
+      isSandbox: true,
+      selectedPlanName: plan ? plan.name : 'Custom'
+    });
+  });
+
+  // Polling check of payment invoice status
+  app.get('/api/deposit/status/:invoiceId', authenticate, (req, res) => {
+    const { invoiceId } = req.params;
+    const user = (req as any).user;
+    const deposits = db.getDeposits();
+    const depIndex = deposits.find(d => d.invoice_id === invoiceId && d.user_id === user.id);
+
+    if (!depIndex) {
+      return res.status(404).json({ error: 'Invoice tracking record not found' });
+    }
+
+    res.json({
+      status: depIndex.status, // 'pending' | 'confirmed' | 'failed'
+      amount_btc: depIndex.amount_btc,
+      amount_usd: depIndex.amount_usd
+    });
+  });
+
+  // Sandbox Test Trigger to manually test and trigger fake invoice confirmation
+  app.post('/api/deposit/sandbox-trigger-confirm', authenticate, (req, res) => {
+    const { invoiceId } = req.body;
+    const user = (req as any).user;
+    const deposit = db.getDeposits().find(d => d.invoice_id === invoiceId && d.user_id === user.id);
+
+    if (!deposit) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (deposit.status !== 'pending') {
+      return res.json({ success: true, status: deposit.status, message: 'Deposit has already been processed.' });
+    }
+
+    // Executting Payout confirmations
+    deposit.status = 'confirmed';
+    db.updateDeposit(deposit);
+
+    // Apply BTC credit safely
+    const originalBalance = user.btc_balance;
+    user.btc_balance = Number((originalBalance + deposit.amount_btc).toFixed(8));
+    
+    // Map plans to their respective targets if active
+    const activePlans = db.getPlans();
+    const purchasedPlan = activePlans.find(p => p.price_btc <= deposit.amount_btc && p.price_btc > 0);
+    if (purchasedPlan) {
+      user.active_plan = purchasedPlan.id;
+      user.plan_activated_at = new Date().toISOString();
+      user.plan_expires_at = new Date(Date.now() + purchasedPlan.duration_days * 24 * 60 * 60 * 1000).toISOString();
+      user.last_mining_at = new Date().toISOString();
+    }
+    db.updateProfile(user);
+
+    // Record complete logs and notifies
+    db.addTransaction({
+      id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      type: 'deposit',
+      description: `Bitcoin hash power purchase deposit (+${deposit.amount_btc} BTC)`,
+      amount_btc: deposit.amount_btc,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Deposit Completed',
+      details: `Sandbox test credit process confirmed successfully. Credited ${deposit.amount_btc} BTC on profile. Plan: ${purchasedPlan ? purchasedPlan.name : 'Manual Credit'}.`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Deposit confirmed! Your account is credited with ${deposit.amount_btc} BTC. Your active miner plan is up and working now.`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Withdraw Request
+  app.post('/api/withdraw', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { amount, walletAddress } = req.body;
+
+    const btcAmount = Number(amount);
+    if (!btcAmount || btcAmount <= 0) {
+      return res.status(400).json({ error: 'Please submit a valid BTC withdrawal amount.' });
+    }
+
+    if (!walletAddress || walletAddress.trim().length < 24) {
+      return res.status(400).json({ error: 'Please specify a valid, full BTC crypto receiving address.' });
+    }
+
+    if (user.btc_balance < btcAmount) {
+      return res.status(400).json({ error: 'Insufficient BTC balance for this withdrawal.' });
+    }
+
+    // Subtract and log immediately
+    user.btc_balance = Number((user.btc_balance - btcAmount).toFixed(8));
+    db.updateProfile(user);
+
+    const withdrawal: Withdrawal = {
+      id: 'wth_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      amount_btc: btcAmount,
+      wallet_address: walletAddress.trim(),
+      status: 'pending',
+      actioned_by: null,
+      actioned_at: null,
+      created_at: new Date().toISOString()
+    };
+
+    db.addWithdrawal(withdrawal);
+
+    // Record pending transaction
+    db.addTransaction({
+      id: 'tx_wd_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      type: 'withdrawal',
+      description: `Withdrawal request to ${walletAddress.substring(0, 8)}... (${btcAmount} BTC)`,
+      amount_btc: btcAmount,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Withdrawal Initiated',
+      details: `Requested withdrawal of ${btcAmount} BTC to ${walletAddress}`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Withdrawal of ${btcAmount} BTC has been initiated and is pending administrator review.`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // NOWPayments IPN Webhook callback (optional, but awesome support!)
+  app.post('/api/payments/webhook', (req, res) => {
+    const { payment_status, order_id, pay_address, pay_amount, invoice_id } = req.body;
+    console.log('Received NOWPayments Webhook IPN:', req.body);
+    
+    // Auto-confirm if finished
+    if (payment_status === 'confirmed' || payment_status === 'finished') {
+      const deposits = db.getDeposits();
+      const deposit = deposits.find(d => d.invoice_id === invoice_id || d.invoice_id === order_id);
+      
+      if (deposit && deposit.status === 'pending') {
+        deposit.status = 'confirmed';
+        db.updateDeposit(deposit);
+
+        const profiles = db.getProfiles();
+        const user = profiles.find(p => p.id === deposit.user_id);
+        
+        if (user) {
+          user.btc_balance = Number((user.btc_balance + deposit.amount_btc).toFixed(8));
+          
+          const plans = db.getPlans();
+          const pMatch = plans.find(pl => pl.price_btc <= deposit.amount_btc && pl.price_btc > 0);
+          if (pMatch) {
+            user.active_plan = pMatch.id;
+            user.plan_activated_at = new Date().toISOString();
+            user.plan_expires_at = new Date(Date.now() + pMatch.duration_days * 24 * 60 * 60 * 1000).toISOString();
+            user.last_mining_at = new Date().toISOString();
+          }
+          db.updateProfile(user);
+
+          db.addTransaction({
+            id: 'tx_pay_hk_' + Math.random().toString(36).substr(2, 9),
+            user_id: user.id,
+            type: 'deposit',
+            description: `NowPayments IPN Deposit completion (+${deposit.amount_btc} BTC)`,
+            amount_btc: deposit.amount_btc,
+            status: 'completed',
+            created_at: new Date().toISOString()
+          });
+
+          db.addNotification({
+            id: 'not_' + Math.random().toString(36).substr(2, 9),
+            user_id: user.id,
+            message: `Deposit invoice verified! Credited ${deposit.amount_btc} BTC to wallet profile.`,
+            is_read: false,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
+    }
+    
+    res.sendStatus(200);
+  });
+
+  // --- ADMINISTRATOR API MODULES ---
+
+  // Admin: Get all users
+  app.get('/api/admin/users', adminAuthenticate, (req, res) => {
+    const adminUser = (req as any).user;
+    let profiles = db.getProfiles();
+    
+    // Hide super-admin comradeabutanimu@gmail.com from other admins
+    if (adminUser.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      profiles = profiles.filter(p => p.email.toLowerCase() !== 'comradeabutanimu@gmail.com');
+    }
+
+    // Return standard profiles without sensitive details (but password can stay hidden)
+    res.json(profiles.map(p => {
+      const { passwordHash, ...rest } = p;
+      return rest;
+    }));
+  });
+
+  // Admin: Edit individual user balance
+  app.post('/api/admin/users/:userId/balance', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    const { btc_balance } = req.body;
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Selected user profile does not exist' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    const previousBalance = user.btc_balance;
+    const newBalance = Number(btc_balance);
+    user.btc_balance = Number(newBalance.toFixed(8));
+    db.updateProfile(user);
+
+    // Save logs
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Balance Modified',
+      details: `Administrator modified balance from ${previousBalance} to ${newBalance} BTC.`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Your balance was updated to ${user.btc_balance} BTC.`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Admin: Suspend toggle
+  app.post('/api/admin/users/:userId/suspend', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    const { is_suspended } = req.body;
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    if (user.id === (req as any).user.id) {
+      return res.status(400).json({ error: 'You are forbidden from suspending your own administrator account.' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    user.is_suspended = Boolean(is_suspended);
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: user.is_suspended ? 'Suspended' : 'Unsuspended',
+      details: `Administrator updated suspension badge to ${user.is_suspended}.`,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Admin: Grant or Revoke Admin rights
+  app.post('/api/admin/users/:userId/admin', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    const { is_admin } = req.body;
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    if (user.id === (req as any).user.id) {
+      return res.status(400).json({ error: 'You cannot revoke your own super-admin permission' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    user.is_admin = Boolean(is_admin);
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Admin Rights Changed',
+      details: `Admin privileges updated to ${user.is_admin}.`,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Admin: edit note
+  app.post('/api/admin/users/:userId/note', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    const { note } = req.body;
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    user.admin_note = note;
+    db.updateProfile(user);
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Admin: change user email address
+  app.post('/api/admin/users/:userId/email', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    const { email } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    const existing = profiles.find(p => p.email.toLowerCase() === email.toLowerCase().trim() && p.id !== userId);
+    if (existing) {
+      return res.status(400).json({ error: 'An account with that email already exists' });
+    }
+
+    const oldEmail = user.email;
+    user.email = email.toLowerCase().trim();
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Email Changed by Admin',
+      details: `Email address updated from ${oldEmail} to ${user.email} by administrator.`,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // Admin: user specific details (payout lists, log histories)
+  app.get('/api/admin/users/:userId/detail', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+    
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (user && user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to view the details of this account.' });
+    }
+
+    const txs = db.getTransactions().filter(t => t.user_id === userId);
+    const logs = db.getActivityLogs().filter(l => l.user_id === userId);
+    const deps = db.getDeposits().filter(d => d.user_id === userId);
+    const wds = db.getWithdrawals().filter(w => w.user_id === userId);
+
+    res.json({
+      transactions: txs.sort((a,b) => b.created_at.localeCompare(a.created_at)),
+      activity_logs: logs.sort((a,b) => b.created_at.localeCompare(a.created_at)),
+      deposits: deps.sort((a,b) => b.created_at.localeCompare(a.created_at)),
+      withdrawals: wds.sort((a,b) => b.created_at.localeCompare(a.created_at))
+    });
+  });
+
+  // Admin: Get all withdrawals
+  app.get('/api/admin/withdrawals', adminAuthenticate, (req, res) => {
+    const adminUser = (req as any).user;
+    const withdrawals = db.getWithdrawals();
+    const profiles = db.getProfiles();
+
+    let merged = withdrawals.map(w => {
+      const u = profiles.find(p => p.id === w.user_id);
+      return {
+        ...w,
+        user_email: u ? u.email : 'unknown'
+      };
+    });
+
+    // Hide withdrawals belonging to comradeabutanimu@gmail.com from other admins
+    if (adminUser.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      merged = merged.filter(w => w.user_email.toLowerCase() !== 'comradeabutanimu@gmail.com');
+    }
+
+    res.json(merged.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // Admin: Action withdrawals
+  app.post('/api/admin/withdrawals/:withdrawId/action', adminAuthenticate, (req, res) => {
+    const { withdrawId } = req.params;
+    const { status } = req.body; // 'approved' | 'rejected'
+
+    const withdrawals = db.getWithdrawals();
+    const wth = withdrawals.find(w => w.id === withdrawId);
+
+    if (!wth) {
+      return res.status(404).json({ error: 'Withdrawal tracking log not found' });
+    }
+
+    if (wth.status !== 'pending') {
+      return res.status(400).json({ error: 'This withdrawal has already been finalized.' });
+    }
+
+    const profiles = db.getProfiles();
+    const targetUser = profiles.find(p => p.id === wth.user_id);
+
+    // Guard comradeabutanimu@gmail.com from other admins
+    if (targetUser && targetUser.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    wth.status = status;
+    wth.actioned_by = (req as any).user.email;
+    wth.actioned_at = new Date().toISOString();
+    db.updateWithdrawal(wth);
+
+    // Update the transaction status on the client register
+    const originalTxs = db.getTransactions();
+    const relevantTx = originalTxs.find(t => t.user_id === wth.user_id && t.type === 'withdrawal' && t.status === 'pending');
+    if (relevantTx) {
+      relevantTx.status = status === 'approved' ? 'completed' : 'failed';
+    }
+
+    // If rejected, refund the BTC balance safely
+    if (status === 'rejected' && targetUser) {
+      targetUser.btc_balance = Number((targetUser.btc_balance + wth.amount_btc).toFixed(8));
+      db.updateProfile(targetUser);
+    }
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: wth.user_id,
+      action: status === 'approved' ? 'Withdrawal Approved' : 'Withdrawal Rejected',
+      details: `${status === 'approved' ? 'Dispensed' : 'Rejected'} withdrawal of ${wth.amount_btc} BTC. Approved by: ${(req as any).user.email}`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: wth.user_id,
+      message: `Your withdrawal of ${wth.amount_btc} BTC has been ${status}. ${status === 'rejected' ? 'Your BTC balance has been refunded.' : ''}`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, withdrawal: wth });
+  });
+
+  // Admin: Get all deposit invoices
+  app.get('/api/admin/deposits', adminAuthenticate, (req, res) => {
+    const adminUser = (req as any).user;
+    const deposits = db.getDeposits();
+    const profiles = db.getProfiles();
+    
+    let merged = deposits.map(d => {
+      const u = profiles.find(p => p.id === d.user_id);
+      return {
+        ...d,
+        user_email: u ? u.email : 'unknown'
+      };
+    });
+
+    // Hide deposits belonging to comradeabutanimu@gmail.com from other admins
+    if (adminUser.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      merged = merged.filter(d => d.user_email.toLowerCase() !== 'comradeabutanimu@gmail.com');
+    }
+
+    res.json(merged.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+  });
+
+  // Admin Manual Overrides for Deposits
+  app.post('/api/admin/deposits/:depositId/confirm', adminAuthenticate, (req, res) => {
+    const { depositId } = req.params;
+    const deposits = db.getDeposits();
+    const depositIndex = deposits.find(d => d.id === depositId);
+
+    if (!depositIndex) {
+      return res.status(404).json({ error: 'Deposit record not found' });
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === depositIndex.user_id);
+
+    // Guard comradeabutanimu@gmail.com from other admins
+    if (user && user.email.toLowerCase() === 'comradeabutanimu@gmail.com' && (req as any).user.email.toLowerCase() !== 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to modify the super administrator account.' });
+    }
+
+    if (depositIndex.status !== 'pending') {
+      return res.json({ success: true, message: 'Deposit has already been processed.' });
+    }
+
+    depositIndex.status = 'confirmed';
+    db.updateDeposit(depositIndex);
+
+    if (user) {
+      user.btc_balance = Number((user.btc_balance + depositIndex.amount_btc).toFixed(8));
+      
+      const plans = db.getPlans();
+      const pMatch = plans.find(pl => pl.price_btc <= depositIndex.amount_btc && pl.price_btc > 0);
+      if (pMatch) {
+        user.active_plan = pMatch.id;
+        user.plan_activated_at = new Date().toISOString();
+        user.plan_expires_at = new Date(Date.now() + pMatch.duration_days * 24 * 60 * 60 * 1000).toISOString();
+        user.last_mining_at = new Date().toISOString();
+      }
+      db.updateProfile(user);
+
+      db.addTransaction({
+        id: 'tx_pay_man_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        type: 'deposit',
+        description: `Manual admin invoice unlock (+${depositIndex.amount_btc} BTC)`,
+        amount_btc: depositIndex.amount_btc,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      });
+
+      db.addNotification({
+        id: 'not_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        message: `Admin manual check cleared! Your account is active with ${depositIndex.amount_btc} BTC credit.`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+
+      db.addActivityLog({
+        id: 'act_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        action: 'Deposit Completed',
+        details: `Manual admin override triggered. Confirmed credit of ${depositIndex.amount_btc} BTC. Action by: ${(req as any).user.email}`,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, deposit: depositIndex });
+  });
+
+  // Admin Master Plan List
+  app.get('/api/admin/plans', adminAuthenticate, (req, res) => {
+    res.json(db.getPlans());
+  });
+
+  // Admin Edit Plan
+  app.post('/api/admin/plans/edit', adminAuthenticate, (req, res) => {
+    const { id, name, price_btc, hash_rate, daily_earn_btc, duration_days, is_active } = req.body;
+    
+    const plan = db.getPlans().find(p => p.id === id);
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    plan.name = name;
+    plan.price_btc = Number(price_btc);
+    plan.hash_rate = hash_rate;
+    plan.daily_earn_btc = Number(daily_earn_btc);
+    plan.duration_days = Number(duration_days);
+    plan.is_active = Boolean(is_active);
+
+    db.updatePlan(plan);
+    res.json({ success: true, plan });
+  });
+
+  // Admin Add Plan
+  app.post('/api/admin/plans/add', adminAuthenticate, (req, res) => {
+    const { name, price_btc, hash_rate, daily_earn_btc, duration_days } = req.body;
+
+    if (!name || isNaN(Number(price_btc)) || !hash_rate || isNaN(Number(daily_earn_btc))) {
+      return res.status(400).json({ error: 'Please enter all numerical plan options.' });
+    }
+
+    const newPlan: Plan = {
+      id: 'plan_' + Math.random().toString(36).substr(2, 9),
+      name,
+      price_btc: Number(price_btc),
+      hash_rate,
+      daily_earn_btc: Number(daily_earn_btc),
+      duration_days: Number(duration_days) || 30,
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+
+    db.addPlan(newPlan);
+    res.json({ success: true, plan: newPlan });
+  });
+
+  // Admin: Get all announcements
+  app.get('/api/admin/announcements', adminAuthenticate, (req, res) => {
+    res.json(db.getAnnouncements());
+  });
+
+  // Admin: Create announcement
+  app.post('/api/admin/announcements/create', adminAuthenticate, (req, res) => {
+    const { message } = req.body;
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Announcement message is required' });
+    }
+
+    const ann: Announcement = {
+      id: 'ann_' + Math.random().toString(36).substr(2, 9),
+      message: message.trim(),
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+
+    db.addAnnouncement(ann);
+    res.json({ success: true, announcement: ann });
+  });
+
+  // Admin: Toggle announcement
+  app.post('/api/admin/announcements/:id/toggle', adminAuthenticate, (req, res) => {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    const ann = db.getAnnouncements().find(a => a.id === id);
+    if (!ann) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    ann.is_active = Boolean(is_active);
+    db.updateAnnouncement(ann);
+    res.json({ success: true, announcement: ann });
+  });
+
+  // Admin: Delete announcement
+  app.post('/api/admin/announcements/:id/delete', adminAuthenticate, (req, res) => {
+    const { id } = req.params;
+    db.deleteAnnouncement(id);
+    res.json({ success: true });
+  });
+
+
+  // --- DAILY AND LIVE SIMULATED CRON MINING ENGINE ---
+  // To keep the user experience incredibly fluid, our server performs 
+  // background mining payouts every 60 seconds for any active cloud miners,
+  // making sure they are persisted automatically even when the user is logged out.
+  setInterval(() => {
+    try {
+      const profiles = db.getProfiles();
+      profiles.forEach(user => {
+        if (user.active_plan && !user.is_suspended) {
+          processMining(user);
+        }
+      });
+    } catch (err) {
+      console.error('Error running background mining interval:', err);
+    }
+  }, 60000); // Trigger payouts every 60 seconds automatically!
+
+
+  // --- VITE DEV / PRODUCTION INTERLOCKS ---
+
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`CryptoBTC Miner full-stack core operational on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

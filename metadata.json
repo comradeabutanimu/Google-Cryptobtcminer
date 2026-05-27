@@ -1,0 +1,6 @@
+{
+  "name": "CryptoBTC Miner",
+  "description": "Mine Bitcoin from the cloud. Skip the hardware and watch your balance grow daily.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
