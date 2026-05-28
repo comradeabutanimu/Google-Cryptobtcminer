@@ -86,6 +86,7 @@ const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
 class Database {
   private data: Schema;
   private supabaseClient = supabase;
+  private availableTables = new Set<string>();
 
   constructor() {
     this.data = {
@@ -136,11 +137,13 @@ class Database {
     }
 
     console.log('Initiating bootstrap sync from Supabase...');
+    this.availableTables.clear();
 
     try {
       // 1. Fetch Profiles
       const { data: profiles, error: pError } = await this.supabaseClient.from('profiles').select('*');
       if (!pError && profiles) {
+        this.availableTables.add('profiles');
         if (profiles.length > 0) {
           this.data.profiles = profiles.map(p => ({
             ...p,
@@ -153,12 +156,17 @@ class Database {
           }
         }
       } else if (pError) {
-        console.error('Error loading profiles from Supabase:', pError.message);
+        if (pError.message.includes('Could not find the table') || pError.message.includes('relation "')) {
+          console.warn('⚠️  Table "profiles" was not found in your Supabase schema cache. Follow the instructions to run the SQL migration script to create it.');
+        } else {
+          console.error('Error loading profiles from Supabase:', pError.message);
+        }
       }
 
       // 2. Fetch Plans
       const { data: plans, error: plError } = await this.supabaseClient.from('plans').select('*');
       if (!plError && plans) {
+        this.availableTables.add('plans');
         if (plans.length > 0) {
           this.data.plans = plans;
           console.log(`Loaded ${plans.length} plans from Supabase.`);
@@ -166,12 +174,17 @@ class Database {
           await this.syncTableToSupabase('plans', this.data.plans);
         }
       } else if (plError) {
-        console.error('Error loading plans from Supabase:', plError.message);
+        if (plError.message.includes('Could not find the table') || plError.message.includes('relation "')) {
+          console.warn('⚠️  Table "plans" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading plans from Supabase:', plError.message);
+        }
       }
 
       // 3. Fetch Transactions
       const { data: txs, error: txError } = await this.supabaseClient.from('transactions').select('*');
       if (!txError && txs) {
+        this.availableTables.add('transactions');
         if (txs.length > 0) {
           this.data.transactions = txs;
           console.log(`Loaded ${txs.length} transactions from Supabase.`);
@@ -179,12 +192,17 @@ class Database {
           await this.syncTableToSupabase('transactions', this.data.transactions);
         }
       } else if (txError) {
-        console.error('Error loading transactions from Supabase:', txError.message);
+        if (txError.message.includes('Could not find the table') || txError.message.includes('relation "')) {
+          console.warn('⚠️  Table "transactions" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading transactions from Supabase:', txError.message);
+        }
       }
 
       // 4. Fetch Deposits
       const { data: deposits, error: depError } = await this.supabaseClient.from('deposits').select('*');
       if (!depError && deposits) {
+        this.availableTables.add('deposits');
         if (deposits.length > 0) {
           this.data.deposits = deposits;
           console.log(`Loaded ${deposits.length} deposits from Supabase.`);
@@ -192,12 +210,17 @@ class Database {
           await this.syncTableToSupabase('deposits', this.data.deposits);
         }
       } else if (depError) {
-        console.error('Error loading deposits from Supabase:', depError.message);
+        if (depError.message.includes('Could not find the table') || depError.message.includes('relation "')) {
+          console.warn('⚠️  Table "deposits" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading deposits from Supabase:', depError.message);
+        }
       }
 
       // 5. Fetch Withdrawals
       const { data: withdrawals, error: wdError } = await this.supabaseClient.from('withdrawals').select('*');
       if (!wdError && withdrawals) {
+        this.availableTables.add('withdrawals');
         if (withdrawals.length > 0) {
           this.data.withdrawals = withdrawals;
           console.log(`Loaded ${withdrawals.length} withdrawals from Supabase.`);
@@ -205,12 +228,17 @@ class Database {
           await this.syncTableToSupabase('withdrawals', this.data.withdrawals);
         }
       } else if (wdError) {
-        console.error('Error loading withdrawals from Supabase:', wdError.message);
+        if (wdError.message.includes('Could not find the table') || wdError.message.includes('relation "')) {
+          console.warn('⚠️  Table "withdrawals" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading withdrawals from Supabase:', wdError.message);
+        }
       }
 
       // 6. Fetch Activity Logs
       const { data: logs, error: lError } = await this.supabaseClient.from('activity_logs').select('*');
       if (!lError && logs) {
+        this.availableTables.add('activity_logs');
         if (logs.length > 0) {
           this.data.activity_logs = logs;
           console.log(`Loaded ${logs.length} activity_logs from Supabase.`);
@@ -218,12 +246,17 @@ class Database {
           await this.syncTableToSupabase('activity_logs', this.data.activity_logs);
         }
       } else if (lError) {
-        console.error('Error loading activity_logs from Supabase:', lError.message);
+        if (lError.message.includes('Could not find the table') || lError.message.includes('relation "')) {
+          console.warn('⚠️  Table "activity_logs" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading activity_logs from Supabase:', lError.message);
+        }
       }
 
       // 7. Fetch Notifications
       const { data: notifs, error: nError } = await this.supabaseClient.from('notifications').select('*');
       if (!nError && notifs) {
+        this.availableTables.add('notifications');
         if (notifs.length > 0) {
           this.data.notifications = notifs;
           console.log(`Loaded ${notifs.length} notifications from Supabase.`);
@@ -231,12 +264,17 @@ class Database {
           await this.syncTableToSupabase('notifications', this.data.notifications);
         }
       } else if (nError) {
-        console.error('Error loading notifications from Supabase:', nError.message);
+        if (nError.message.includes('Could not find the table') || nError.message.includes('relation "')) {
+          console.warn('⚠️  Table "notifications" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading notifications from Supabase:', nError.message);
+        }
       }
 
       // 8. Fetch Announcements
       const { data: anns, error: annError } = await this.supabaseClient.from('announcements').select('*');
       if (!annError && anns) {
+        this.availableTables.add('announcements');
         if (anns.length > 0) {
           this.data.announcements = anns;
           console.log(`Loaded ${anns.length} announcements from Supabase.`);
@@ -244,18 +282,22 @@ class Database {
           await this.syncTableToSupabase('announcements', this.data.announcements);
         }
       } else if (annError) {
-        console.error('Error loading announcements from Supabase:', annError.message);
+        if (annError.message.includes('Could not find the table') || annError.message.includes('relation "')) {
+          console.warn('⚠️  Table "announcements" was not found in your Supabase schema cache.');
+        } else {
+          console.error('Error loading announcements from Supabase:', annError.message);
+        }
       }
 
       this.save();
-      console.log('Successfully completed bootstrap sync from Supabase.');
+      console.log('Finished initializing Supabase detection/sync context.');
     } catch (err: any) {
       console.error('Unexpected error during Supabase boot seeding:', err.message);
     }
   }
 
   private async syncTableToSupabase(tableName: string, rows: any[]) {
-    if (!this.supabaseClient || rows.length === 0) return;
+    if (!this.supabaseClient || !this.availableTables.has(tableName) || rows.length === 0) return;
     try {
       const formattedRows = rows.map(r => {
         if (tableName === 'profiles') {
@@ -279,7 +321,7 @@ class Database {
   }
 
   private async supabaseInsert(tableName: string, row: any) {
-    if (!this.supabaseClient) return;
+    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
     try {
       const formattedRow = { ...row };
       if (tableName === 'profiles' && typeof row.settings === 'object') {
@@ -295,7 +337,7 @@ class Database {
   }
 
   private async supabaseUpdate(tableName: string, row: any, id: string) {
-    if (!this.supabaseClient) return;
+    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
     try {
       const formattedRow = { ...row };
       if (tableName === 'profiles' && typeof row.settings === 'object') {
@@ -311,7 +353,7 @@ class Database {
   }
 
   private async supabaseDelete(tableName: string, id: string) {
-    if (!this.supabaseClient) return;
+    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
     try {
       const { error } = await this.supabaseClient.from(tableName).delete().eq('id', id);
       if (error) {

@@ -29,6 +29,9 @@ export interface ProfileSettings {
   notifyWithdrawUpdate: boolean;
   notifySecurityAlert: boolean;
   notifyPromotions: boolean;
+  targetBtcPrice?: number | null;
+  targetBtcPriceDirection?: 'above' | 'below' | null;
+  targetBtcPriceTriggered?: boolean | null;
 }
 
 export interface Plan {

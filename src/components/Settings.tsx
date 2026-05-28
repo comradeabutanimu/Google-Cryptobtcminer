@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { User, Shield, Eye, EyeOff, Bell, Loader, Check, Smartphone, Lock, Copy } from 'lucide-react';
+import { User, Shield, Eye, EyeOff, Bell, Loader, Check, Smartphone, Lock, Copy, BellRing, X } from 'lucide-react';
 import { Profile, ProfileSettings } from '../types.js';
 import { api } from '../lib/api.js';
 
@@ -46,6 +46,8 @@ export default function Settings({ profile, onProfileUpdated, toast }: SettingsP
   const [notifyWithdrawUpdate, setNotifyWithdrawUpdate] = useState(profile.settings?.notifyWithdrawUpdate ?? true);
   const [notifySecurityAlert, setNotifySecurityAlert] = useState(profile.settings?.notifySecurityAlert ?? true);
   const [notifyPromotions, setNotifyPromotions] = useState(profile.settings?.notifyPromotions ?? false);
+  const [targetBtcPrice, setTargetBtcPrice] = useState<string>(profile.settings?.targetBtcPrice ? String(profile.settings.targetBtcPrice) : '');
+  const [savingTarget, setSavingTarget] = useState(false);
 
   // Sync state with profile prop updates defensively
   React.useEffect(() => {
@@ -57,6 +59,7 @@ export default function Settings({ profile, onProfileUpdated, toast }: SettingsP
       setNotifyWithdrawUpdate(profile.settings.notifyWithdrawUpdate ?? true);
       setNotifySecurityAlert(profile.settings.notifySecurityAlert ?? true);
       setNotifyPromotions(profile.settings.notifyPromotions ?? false);
+      setTargetBtcPrice(profile.settings.targetBtcPrice ? String(profile.settings.targetBtcPrice) : '');
     }
   }, [profile]);
 
@@ -119,6 +122,56 @@ export default function Settings({ profile, onProfileUpdated, toast }: SettingsP
       onProfileUpdated(res.profile);
     } catch (err: any) {
       toast('Failed to preserve options.', 'error');
+    }
+  };
+
+  const handleSaveTargetBtcPrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetBtcPrice || isNaN(Number(targetBtcPrice)) || Number(targetBtcPrice) <= 0) {
+      return toast('Please enter a valid positive BTC price target (USD)', 'error');
+    }
+    
+    setSavingTarget(true);
+    try {
+      const res = await api.updateProfile({
+        settings: {
+          blurBalances,
+          notifyDepositConfirm,
+          notifyWithdrawUpdate,
+          notifySecurityAlert,
+          notifyPromotions,
+          targetBtcPrice: Number(targetBtcPrice)
+        }
+      });
+      onProfileUpdated(res.profile);
+      toast(`🎯 Target Alert Activated! We'll notify you when the market price hits $${Number(targetBtcPrice).toLocaleString()}`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to update price alerts.', 'error');
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
+  const handleCancelTargetBtcPrice = async () => {
+    setSavingTarget(true);
+    try {
+      const res = await api.updateProfile({
+        settings: {
+          blurBalances,
+          notifyDepositConfirm,
+          notifyWithdrawUpdate,
+          notifySecurityAlert,
+          notifyPromotions,
+          targetBtcPrice: null
+        }
+      });
+      onProfileUpdated(res.profile);
+      setTargetBtcPrice('');
+      toast('Target price alert cancelled.', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to cancel price alerts.', 'error');
+    } finally {
+      setSavingTarget(false);
     }
   };
 
@@ -628,6 +681,77 @@ export default function Settings({ profile, onProfileUpdated, toast }: SettingsP
                   />
                   <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                 </label>
+              </div>
+
+              {/* BTC Target Price notification threshold segment */}
+              <div className="pt-6 mt-6 border-t border-gray-150">
+                <div className="bg-orange-50/40 rounded-2xl border border-orange-100 p-5 space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="p-2 bg-orange-100/60 rounded-xl text-orange-600 mt-0.5">
+                      <BellRing className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-bold text-gray-900">Custom Target BTC Price Alert</h5>
+                      <p className="text-xs text-gray-500 leading-normal mt-0.5">
+                        Configure a custom target Bitcoin price threshold. Our system will automatically trigger a delivery alert notification as soon as the market price reaches your specified value.
+                      </p>
+                    </div>
+                  </div>
+
+                  {profile.settings?.targetBtcPrice ? (
+                    <div className="bg-white rounded-xl border border-orange-100/80 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Active Target Alert</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-extrabold text-neutral-900">
+                            ${Number(profile.settings.targetBtcPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            profile.settings.targetBtcPriceDirection === 'above' 
+                              ? 'bg-emerald-50 text-emerald-600' 
+                              : 'bg-indigo-50 text-indigo-600'
+                          }`}>
+                            Triggers if goes {profile.settings.targetBtcPriceDirection === 'above' ? 'Above' : 'Below'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCancelTargetBtcPrice}
+                        disabled={savingTarget}
+                        className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl cursor-pointer select-none transition-all flex items-center justify-center space-x-1.5"
+                      >
+                        {savingTarget ? <Loader className="animate-spin h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                        <span>Cancel Alert</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSaveTargetBtcPrice} className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                          <span className="text-gray-400 text-sm font-bold">$</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={targetBtcPrice}
+                          onChange={(e) => setTargetBtcPrice(e.target.value)}
+                          placeholder="e.g. 75,000"
+                          className="w-full pl-8 pr-4 py-2.5 bg-white border border-gray-200 focus:border-orange-500 rounded-xl text-sm font-bold text-gray-900"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={savingTarget}
+                        className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl cursor-pointer select-none transition-all flex items-center justify-center space-x-1.5 shrink-0 shadow-xs hover:shadow-md"
+                      >
+                        {savingTarget ? <Loader className="animate-spin h-4 w-4" /> : <BellRing className="h-4 w-4" />}
+                        <span>Set Alert Threshold</span>
+                      </button>
+                    </form>
+                  )}
+                </div>
               </div>
 
             </div>

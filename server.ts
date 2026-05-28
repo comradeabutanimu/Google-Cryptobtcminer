@@ -443,6 +443,94 @@ async function startServer() {
     // Remove pending record once complete
     pendingRegistrations.delete(emailKey);
 
+    // Dispatch a beautiful warm Welcome Email to the newly registered customer
+    const welcomeDate = new Date();
+    const formattedDate = welcomeDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
+
+    const welcomeHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
+        <div style="background-color: #0C0A09; padding: 40px 30px; border-radius: 24px; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3); text-align: left;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 8px;">
+              <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+            </div>
+            <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #F97316;">
+              Welcome to the Future of Cloud Mining
+            </div>
+          </div>
+
+          <h2 style="font-size: 22px; font-weight: 700; color: #FFFFFF; margin: 0 0 16px 0; border-bottom: 1px solid #1C1917; padding-bottom: 12px;">
+            Hello ${name},
+          </h2>
+          
+          <p style="font-size: 15px; color: #D6D3D1; line-height: 1.6; margin: 0 0 20px 0;">
+            A warm welcome to <strong>Crypto BTC Miner</strong>! We are absolutely thrilled to have you join our premier global cloud mining network. Your account is now fully verified, active, and your free high-performance 10 GH/s starter mining contract is automatically online.
+          </p>
+
+          <div style="background-color: #151414; border: 1px solid #292421; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #8C8A88; margin-bottom: 12px; border-bottom: 1px solid #292421; padding-bottom: 6px;">
+              ACCOUNT INFORMATION DETAILED REGISTER
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #E7E5E4;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #A8A29E; width: 140px;">Username / Name:</td>
+                <td style="padding: 6px 0; font-weight: 500;">${name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">Registered Email:</td>
+                <td style="padding: 6px 0; font-weight: 500; font-family: monospace;">${emailKey}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">Creation Date:</td>
+                <td style="padding: 6px 0; font-weight: 500;">${formattedDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">Account Status:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #10B981;">ACTIVE & SECURED</td>
+              </tr>
+            </table>
+          </div>
+
+          <p style="font-size: 14px; color: #A8A29E; line-height: 1.6; margin: 0 0 16px 0; padding-left: 4px; border-left: 3px solid #F97316;">
+            <strong>Security Reminder:</strong> To preserve maximum safety of your portfolio, your secure password is <strong>not</strong> displayed in this email. Please make sure to treat your credentials with absolute discretion and keep them private.
+          </p>
+
+          <h3 style="font-size: 16px; font-weight: 700; color: #FFFFFF; margin: 24px 0 12px 0;">
+            Steps to Begin Mining Operations:
+          </h3>
+          <ol style="font-size: 14px; color: #D6D3D1; line-height: 1.6; margin: 0 0 24px 0; padding-left: 20px;">
+            <li style="margin-bottom: 8px;"><strong>Sign In:</strong> Navigate to the <a href="https://cryptobtcminer.com" style="color: #F97316; text-decoration: underline;">Crypto BTC Miner Login Portal</a>.</li>
+            <li style="margin-bottom: 8px;"><strong>Use Credentials:</strong> Input your registered email address (<code>${emailKey}</code>) and your selected secure password.</li>
+            <li style="margin-bottom: 8px;"><strong>Explore Contracts:</strong> Boost your active hashing throughput under the 'Mining Plans' panel to accelerate your daily BTC earnings.</li>
+            <li style="margin-bottom: 8px;"><strong>Setup 2FA:</strong> Enable Two-Factor Authentication under the 'Settings' tab to enforce bank-grade protection over your fund withdrawals.</li>
+          </ol>
+
+          <div style="text-align: center; margin: 30px 0 10px 0;">
+            <a href="https://cryptobtcminer.com/login" style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 32px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2); transition: all 0.2s ease;">
+              Access Mining Dashboard →
+            </a>
+          </div>
+
+          <div style="border-top: 1px solid #1C1917; margin-top: 30px; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5; text-align: center;">
+            Need help? Reach out directly via our real-time in-app Tidio Chat or contact elite engineering operations at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Dispatch the welcome email asynchronously
+    sendEmail(emailKey, "Successful Registration - Welcome to Crypto BTC Miner", welcomeHtml).catch(err => {
+      console.error('Error sending welcome email to user:', err);
+    });
+
     res.json({ token: userId, profile: newProfile });
   });
 
@@ -648,6 +736,55 @@ async function startServer() {
 
     // Clear verification map record
     forgotPasswordOtps.delete(emailKey);
+
+    // Send security notification email to confirm password update
+    const resetSuccessHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
+        <div style="background-color: #0C0A09; padding: 40px 30px; border-radius: 24px; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3); text-align: left;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 8px;">
+              <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+            </div>
+            <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #F97316;">
+              Security Confirmation Notification
+            </div>
+          </div>
+
+          <h2 style="font-size: 22px; font-weight: 700; color: #FFFFFF; margin: 0 0 16px 0; border-bottom: 1px solid #1C1917; padding-bottom: 12px;">
+            Secure Update Completed,
+          </h2>
+          
+          <p style="font-size: 15px; color: #D6D3D1; line-height: 1.6; margin: 0 0 20px 0;">
+            This notification confirms that the password associated with your account <strong>${emailKey}</strong> has been successfully updated on <strong>${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</strong>.
+          </p>
+
+          <p style="font-size: 14px; color: #A8A29E; line-height: 1.6; margin: 0 0 20px 0;">
+            Your new credentials are fully active. For security policy reasons, the email does <strong>not</strong> contain your new password. You can now securely log in to your active mining dashboard using your new password.
+          </p>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://cryptobtcminer.com/login" style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 32px; border-radius: 12px; display: inline-block;">
+              Go to Login Page
+            </a>
+          </div>
+
+          <div style="background-color: #1C1917; border-left: 4px solid #EF4444; padding: 16px; border-radius: 8px; margin-top: 24px;">
+            <h4 style="margin: 0 0 8px 0; color: #EF4444; font-size: 14px; font-weight: bold;">Did you not request this password change?</h4>
+            <p style="margin: 0; color: #A8A29E; font-size: 13px; line-height: 1.5;">
+              If you did NOT trigger or authorize this credentials modification, your profile security could be compromised. Please immediately reset your email password and contact our elite emergency response desk at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none; font-weight: bold;">support@cryptobtcminer.com</a>.
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid #1C1917; margin-top: 30px; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5; text-align: center;">
+            Crypto BTC Miner, Security Operations Team.
+          </div>
+        </div>
+      </div>
+    `;
+
+    sendEmail(emailKey, "Password Reset Confirmed - Crypto BTC Miner", resetSuccessHtml).catch(err => {
+      console.error('Error sending reset confirmation email:', err);
+    });
 
     res.json({ success: true, message: 'Password updated successfully. You can now login.' });
   });
