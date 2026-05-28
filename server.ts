@@ -534,13 +534,225 @@ async function startServer() {
     res.json({ token: userId, profile: newProfile });
   });
 
+  // Backend helper for capturing IP, looking up location, sending notification alerts and recording trusted IPs
+  const processUserLoginSecurity = async (req: express.Request, user: any) => {
+    const clientIp = (req.headers['x-forwarded-for'] as string || req.headers['x-real-ip'] as string || req.socket.remoteAddress || '127.0.0.1').split(',')[0].trim();
+    const userAgent = req.headers['user-agent'] || 'Unknown Browser / Device';
+    
+    let country = 'United Kingdom';
+    let city = 'London';
+    let countryCode = 'GB';
+
+    try {
+      if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && !clientIp.startsWith('::ffff:')) {
+        const gRes = await fetch(`https://ipapi.co/${clientIp}/json/`).catch(() => null);
+        if (gRes && gRes.ok) {
+          const data = await gRes.json();
+          if (data && !data.error) {
+            country = data.country_name || 'Unknown Country';
+            city = data.city || 'Unknown City';
+            countryCode = data.country || 'GB';
+          }
+        } else {
+          const gRes2 = await fetch(`http://ip-api.com/json/${clientIp}`).catch(() => null);
+          if (gRes2 && gRes2.ok) {
+            const data2 = await gRes2.json();
+            if (data2 && data2.status === 'success') {
+              country = data2.country || 'Unknown Country';
+              city = data2.city || 'Unknown City';
+              countryCode = data2.countryCode || 'GB';
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[GEOLOCATION] Geocoding lookup failed for IP:', clientIp, err);
+    }
+
+    let knownIpsList: string[] = [];
+    if (user.known_ips) {
+      try {
+        knownIpsList = JSON.parse(user.known_ips);
+      } catch (_) {
+        knownIpsList = user.known_ips.split(',').map((ip: string) => ip.trim()).filter(Boolean);
+      }
+    }
+
+    const isNewIp = knownIpsList.length > 0 && !knownIpsList.includes(clientIp);
+
+    if (isNewIp) {
+      const lockLink = `${req.protocol}://${req.get('host')}/api/auth/lock-account?user_id=${user.id}`;
+      const formattedDate = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+
+      const emailHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
+          <div style="background-color: #0C0A09; padding: 40px 30px; border-radius: 24px; border: 1px solid #EF4444; box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.2); text-align: left;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+              <div style="font-size: 24px; font-weight: 800; color: #EF4444; letter-spacing: -0.025em; margin-bottom: 6px;">
+                UNKNOWN IP ADDRESS LOGIN ALERT
+              </div>
+              <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #EF4444;">
+                Security Monitoring Service
+              </div>
+            </div>
+
+            <p style="font-size: 15px; color: #D6D3D1; line-height: 1.6; margin: 0 0 20px 0;">
+              Hello ${user.full_name || 'Member'},
+            </p>
+
+            <p style="font-size: 15px; color: #D6D3D1; line-height: 1.6; margin: 0 0 20px 0;">
+              We detected a successful login to your <strong>Crypto BTC Miner</strong> profile from an unrecognized IP address. To preserve your portfolio, please verify if this request is yours:
+            </p>
+
+            <div style="background-color: #151414; border: 1px solid #292421; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+              <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #EF4444; margin-bottom: 12px; border-bottom: 1px solid #292421; padding-bottom: 6px;">
+                LOG DETAILS REGISTER
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #E7E5E4;">
+                <tr>
+                  <td style="padding: 6px 0; font-weight: bold; color: #A8A29E; width: 140px;">Estimated Location:</td>
+                  <td style="padding: 6px 0; font-weight: 500; color: #FFFFFF;">${city}, ${country}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">IP Address:</td>
+                  <td style="padding: 6px 0; font-weight: 500; font-family: monospace; color: #FFFFFF;">${clientIp}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">Device / Browser:</td>
+                  <td style="padding: 6px 0; font-weight: 500;">${userAgent}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-weight: bold; color: #A8A29E;">Access Date:</td>
+                  <td style="padding: 6px 0; font-weight: 500;">${formattedDate}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="background-color: #1C1917; border-left: 4px solid #EF4444; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+              <h4 style="margin: 0 0 8px 0; color: #EF4444; font-size: 14px; font-weight: bold;">Did you NOT authorize this action?</h4>
+              <p style="margin: 0; color: #A8A29E; font-size: 13px; line-height: 1.5;">
+                If this login was not triggered by you, someone else might have gained access to your credentials. Your funds are at risk. Please lock your account immediately to block any withdrawal activities.
+              </p>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0 10px 0;">
+              <a href="${lockLink}" style="background-color: #EF4444; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 32px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); transition: all 0.2s ease;">
+                🔒 This Wasn't Me - Lock My Account Now
+              </a>
+            </div>
+
+            <div style="border-top: 1px solid #1C1917; margin-top: 30px; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5; text-align: center;">
+              Crypto BTC Miner, Global Cyber-Security Desk. Contact support at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      sendEmail(user.email, `⚠️ New login to your account from ${city}, ${country}`, emailHtml).catch(err => {
+        console.error('[SMTP ALERT ERROR] Failed to dispatch login alert:', err);
+      });
+
+      db.addNotification({
+        id: 'not_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        message: `Security warning trigger: We detected a login from an unknown location (${city}, ${country}). An alert mail has been dispatched.`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    if (!knownIpsList.includes(clientIp)) {
+      knownIpsList.push(clientIp);
+      user.known_ips = JSON.stringify(knownIpsList);
+      if (!user.detected_language) {
+        const langMapping: Record<string, string> = {
+          'SA': 'ar', 'AE': 'ar', 'QA': 'ar', 'EG': 'ar', 'DZ': 'ar', 'JO': 'ar', 'LB': 'ar', 'OM': 'ar', 'YE': 'ar', 'IQ': 'ar', 'KW': 'ar', 'BH': 'ar',
+          'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
+          'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
+          'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
+          'NG': 'ha',
+          'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
+        };
+        user.detected_language = langMapping[countryCode] || 'en';
+      }
+      db.updateProfile(user);
+    }
+  };
+
+  // Lock account endpoint triggered directly by emails
+  app.get('/api/auth/lock-account', (req, res) => {
+    const { user_id } = req.query;
+    if (!user_id) {
+      return res.status(400).send('<h1>Error</h1><p>Invalid account identification link.</p>');
+    }
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === user_id);
+
+    if (!user) {
+      return res.status(404).send('<h1>Error</h1><p>Account profile not found.</p>');
+    }
+
+    user.is_suspended = true;
+    db.updateProfile(user);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Account Locked Alert',
+      details: 'Account secured and locked immediately via verification email links.',
+      created_at: new Date().toISOString()
+    });
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Profile Secured - Crypto BTC Miner</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0C0A09; color: #FFFFFF; text-align: center; padding: 60px 20px; }
+          .container { max-width: 500px; margin: 0 auto; background: #1C1917; padding: 40px; border-radius: 20px; border: 1px solid #EF4444; box-shadow: 0 10px 40px rgba(239, 68, 68, 0.1); }
+          h1 { color: #EF4444; font-size: 24px; margin-bottom: 16px; }
+          p { color: #D6D3D1; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+          .badge { font-weight: bold; background: rgba(239, 68, 68, 0.2); color: #EF4444; padding: 8px 16px; border-radius: 9999px; display: inline-block; margin-bottom: 20px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+          .support { font-size: 13px; color: #78716C; margin-top: 30px; border-top: 1px solid #2E2A27; padding-top: 20px; }
+          a { color: #F97316; text-decoration: none; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div style="font-size: 50px; margin-bottom: 12px;">🔒</div>
+          <div class="badge">Profile Locked & Secured</div>
+          <h1>Account Locked Successfully</h1>
+          <p>The profile <strong>${user.email}</strong> is now locked. All active logins are neutralized, and further cloud withdrawals have been deactivated automatically to secure your assets.</p>
+          <p>Please reset your email password and contact support to re-verify identity.</p>
+          <div class="support">
+            Need assistance? Reach operations immediately at <a href="mailto:support@cryptobtcminer.com">support@cryptobtcminer.com</a>.
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  });
+
   // Auth: Register (Disabled directly - must go through OTP send/verify)
   app.post('/api/auth/signup', (req, res) => {
     return res.status(400).json({ error: 'Direct registration is disabled. Please verify your email with a 6-digit OTP code to complete account creation.' });
   });
 
   // Auth: Login
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -562,6 +774,8 @@ async function startServer() {
       return res.json({ require_2fa: true, email: user.email });
     }
 
+    await processUserLoginSecurity(req, user);
+
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
@@ -574,7 +788,7 @@ async function startServer() {
   });
 
   // Verify dynamic 2FA Login Form
-  app.post('/api/auth/verify-2fa-login', (req, res) => {
+  app.post('/api/auth/verify-2fa-login', async (req, res) => {
     const { email, password, code } = req.body;
     if (!email || !password || !code) {
       return res.status(400).json({ error: 'Email, password, and 2FA verification code are required.' });
@@ -599,6 +813,8 @@ async function startServer() {
     if (!isValid) {
       return res.status(400).json({ error: 'Invalid 6-digit authentication code. Please check your app.' });
     }
+
+    await processUserLoginSecurity(req, user);
 
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
@@ -799,6 +1015,17 @@ async function startServer() {
   // Get self profile
   app.get('/api/user/profile', authenticate, (req, res) => {
     res.json((req as any).user);
+  });
+
+  // Save manually updated language to user profile
+  app.post('/api/user/language', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { language } = req.body;
+    if (language) {
+      user.detected_language = language;
+      db.updateProfile(user);
+    }
+    res.json({ success: true, profile: user });
   });
 
   // Activate/purchase a plan directly using balance or activate the Free plan

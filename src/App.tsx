@@ -8,10 +8,11 @@ import {
   BarChart3, Award, Clock, Download, Upload, Bell, Sliders, 
   Users, Settings as SettingsIcon, LifeBuoy, ShieldAlert, Shield, LogOut,
   Menu, X, Sparkles, MessageSquare, Send, Check, AlertTriangle, ChevronDown,
-  Eye, EyeOff, Smartphone, Lock
+  Eye, EyeOff, Smartphone, Lock, Globe
 } from 'lucide-react';
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
+import { translations, LanguageCode, LANGUAGES } from './locales.ts';
 
 // Core layout/page views imports
 import Navbar from './components/Navbar.tsx';
@@ -150,6 +151,22 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [btcPrice, setBtcPrice] = useState<CoingeckoPrice>({ btc_usd: 68420.0, change_24h: 1.84 });
 
+  // Localization states
+  const [currentLang, setCurrentLang] = useState<LanguageCode>(() => {
+    const saved = localStorage.getItem('cryptobtc_miner_lang');
+    if (saved && ['en', 'fr', 'ar', 'es', 'pt', 'ha', 'sw'].includes(saved)) {
+      return saved as LanguageCode;
+    }
+    return 'en';
+  });
+
+  const t = translations[currentLang] || translations['en'];
+
+  // 2FA Security popup banner alert state
+  const [dismissed2FaAlert, setDismissed2FaAlert] = useState<boolean>(() => {
+    return localStorage.getItem('cryptobtc_miner_2fa_alert_dismissed') === 'true';
+  });
+
   // Custom layout states
   const [signupStep, setSignupStep] = useState<'details' | 'otp'>('details');
   const [signupEmail, setSignupEmail] = useState('');
@@ -179,6 +196,9 @@ export default function App() {
   const [showRegPassword, setShowRegPassword] = useState<boolean>(false);
   const [showResetPassword, setShowResetPassword] = useState<boolean>(false);
   const [showResetConfirmPassword, setShowResetConfirmPassword] = useState<boolean>(false);
+
+  // Initial settings segment
+  const [initialSettingsSegment, setInitialSettingsSegment] = useState<'profile' | 'security' | 'privacy' | 'notifications'>('profile');
 
   // UI state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
@@ -306,6 +326,11 @@ export default function App() {
           const profileRes = await api.getProfile();
           setUserProfile(profileRes);
           setIsLoggedIn(true);
+
+          if (profileRes.detected_language && ['en', 'fr', 'ar', 'es', 'pt', 'ha', 'sw'].includes(profileRes.detected_language)) {
+            setCurrentLang(profileRes.detected_language as LanguageCode);
+            localStorage.setItem('cryptobtc_miner_lang', profileRes.detected_language);
+          }
           
           // Respect URL path if we are logged in, otherwise route correctly
           const urlPath = window.location.pathname;
@@ -338,6 +363,52 @@ export default function App() {
           setCurrentPage('home');
         }
       } else {
+        // Visitor auto language geocode detection using free ipapi.co or fallback ip-api.com
+        const savedLang = localStorage.getItem('cryptobtc_miner_lang');
+        if (!savedLang) {
+          try {
+            const ipRes = await fetch('https://ipapi.co/json/').catch(() => null);
+            if (ipRes && ipRes.ok) {
+              const ipData = await ipRes.json();
+              if (ipData && ipData.country_code) {
+                const countryCode = ipData.country_code.toUpperCase();
+                const langMapping: Record<string, LanguageCode> = {
+                  'SA': 'ar', 'AE': 'ar', 'QA': 'ar', 'EG': 'ar', 'DZ': 'ar', 'JO': 'ar', 'LB': 'ar', 'OM': 'ar', 'YE': 'ar', 'IQ': 'ar', 'KW': 'ar', 'BH': 'ar',
+                  'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
+                  'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
+                  'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
+                  'NG': 'ha',
+                  'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
+                };
+                const detectedL = langMapping[countryCode] || 'en';
+                setCurrentLang(detectedL);
+                localStorage.setItem('cryptobtc_miner_lang', detectedL);
+              }
+            } else {
+              const ipRes2 = await fetch('http://ip-api.com/json').catch(() => null);
+              if (ipRes2 && ipRes2.ok) {
+                const ipData2 = await ipRes2.json();
+                if (ipData2 && ipData2.status === 'success' && ipData2.countryCode) {
+                  const countryCode = ipData2.countryCode.toUpperCase();
+                  const langMapping: Record<string, LanguageCode> = {
+                    'SA': 'ar', 'AE': 'ar', 'QA': 'ar', 'EG': 'ar', 'DZ': 'ar', 'JO': 'ar', 'LB': 'ar', 'OM': 'ar', 'YE': 'ar', 'IQ': 'ar', 'KW': 'ar', 'BH': 'ar',
+                    'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
+                    'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
+                    'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
+                    'NG': 'ha',
+                    'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
+                  };
+                  const detectedL = langMapping[countryCode] || 'en';
+                  setCurrentLang(detectedL);
+                  localStorage.setItem('cryptobtc_miner_lang', detectedL);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Visitor location lookup failed:', err);
+          }
+        }
+
         // If they are not logged in, decode the path and force login for protected section paths
         const urlPath = window.location.pathname;
         const decoded = decodePath(urlPath, false);
@@ -403,6 +474,21 @@ export default function App() {
   };
 
   // --- ACTIONS HANDLERS ---
+  const handleLanguageChange = async (lang: LanguageCode) => {
+    setCurrentLang(lang);
+    localStorage.setItem('cryptobtc_miner_lang', lang);
+    if (isLoggedIn) {
+      try {
+        const updateRes = await api.saveLanguage(lang);
+        if (updateRes && updateRes.profile) {
+          setUserProfile(updateRes.profile);
+        }
+      } catch (err) {
+        console.warn('Unable to persist manual language update to server:', err);
+      }
+    }
+  };
+
   const handleSignOut = () => {
     clearToken();
     setIsLoggedIn(false);
@@ -536,6 +622,8 @@ export default function App() {
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             onLogout={handleSignOut}
+            currentLang={currentLang}
+            onLanguageChange={handleLanguageChange}
           />
 
           {/* ==================== HOME PAGE LAYOUT ==================== */}
@@ -1567,6 +1655,22 @@ export default function App() {
 
               {/* Right side notifications info indicators */}
               <div className="flex items-center space-x-3">
+                {/* Dashboard Manual Language Selector */}
+                <div className="relative flex items-center space-x-1 border border-gray-100 bg-gray-50 rounded-lg px-2 py-1">
+                  <Globe className="h-3.5 w-3.5 text-gray-400" />
+                  <select
+                    value={currentLang}
+                    onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)}
+                    className="text-xs font-semibold text-gray-600 bg-transparent border-none focus:outline-hidden cursor-pointer"
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name.substring(0, 3)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button 
                   onClick={() => setDashboardTab('notifications')}
                   className="relative p-2 text-gray-400 hover:text-gray-900 transition-colors"
@@ -1591,6 +1695,45 @@ export default function App() {
             <div className="flex-1 p-4 sm:p-6 overflow-y-auto max-w-7xl mx-auto w-full">
               {userProfile && (
                 <>
+                  {/* 2FA SECURITY ALERT BANNER (FEATURE 3) */}
+                  {!userProfile.two_factor_enabled && !dismissed2FaAlert && (
+                    <div id="2fa-security-alert-banner" className="mb-6 p-5 sm:p-6 bg-rose-50 border border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-left">
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
+                          <ShieldAlert className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-rose-950">
+                            {t.alert2faTitle}
+                          </h4>
+                          <p className="text-xs text-rose-800 font-medium mt-1 leading-relaxed max-w-2xl">
+                            {t.alert2faBody}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 w-full md:w-auto shrink-0">
+                        <button
+                          onClick={() => {
+                            setInitialSettingsSegment('security');
+                            setDashboardTab('settings');
+                          }}
+                          className="flex-1 md:flex-none px-4 py-2 bg-rose-650 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer text-center whitespace-nowrap"
+                        >
+                          {t.enable2fa}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDismissed2FaAlert(true);
+                            localStorage.setItem('cryptobtc_miner_2fa_alert_dismissed', 'true');
+                          }}
+                          className="flex-1 md:flex-none px-4 py-2 bg-white hover:bg-rose-100/50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
+                        >
+                          {t.remindLater}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {dashboardTab === 'overview' && (
                     <Overview 
                       profile={userProfile}
@@ -1668,6 +1811,7 @@ export default function App() {
                       profile={userProfile}
                       onProfileUpdated={setUserProfile}
                       toast={triggerToast}
+                      initialSegment={initialSettingsSegment}
                     />
                   )}
 

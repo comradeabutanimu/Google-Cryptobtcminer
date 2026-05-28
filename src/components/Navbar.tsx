@@ -4,16 +4,26 @@
  */
 
 import { useState } from 'react';
-import { Menu, X, Coins } from 'lucide-react';
+import { Menu, X, Coins, Globe } from 'lucide-react';
+import { LANGUAGES, LanguageCode } from '../locales.ts';
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
   currentPage: string;
   isLoggedIn: boolean;
   onLogout: () => void;
+  currentLang: LanguageCode;
+  onLanguageChange: (lang: LanguageCode) => void;
 }
 
-export default function Navbar({ onNavigate, currentPage, isLoggedIn, onLogout }: NavbarProps) {
+export default function Navbar({ 
+  onNavigate, 
+  currentPage, 
+  isLoggedIn, 
+  onLogout,
+  currentLang,
+  onLanguageChange
+}: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollToSection = (id: string) => {
@@ -68,6 +78,22 @@ export default function Navbar({ onNavigate, currentPage, isLoggedIn, onLogout }
 
           {/* Right Core Action Pill Buttons */}
           <div className="hidden md:flex items-center space-x-[20px]">
+            {/* Manual Language Switcher */}
+            <div className="relative flex items-center space-x-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+              <Globe className="h-3.5 w-3.5 text-gray-500" />
+              <select
+                value={currentLang}
+                onChange={(e) => onLanguageChange(e.target.value as LanguageCode)}
+                className="text-xs font-semibold text-gray-700 bg-transparent border-none focus:outline-hidden cursor-pointer pre-selected"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {isLoggedIn ? (
               <>
                 <button 
@@ -134,6 +160,26 @@ export default function Navbar({ onNavigate, currentPage, isLoggedIn, onLogout }
           >
             FAQ
           </button>
+
+          {/* Lang Selector inside mobile drawer */}
+          <div className="px-3 py-2 flex items-center space-x-2 border-t border-gray-100 mt-2">
+            <Globe className="h-4 w-4 text-gray-500" />
+            <select
+              value={currentLang}
+              onChange={(e) => {
+                onLanguageChange(e.target.value as LanguageCode);
+                setMobileMenuOpen(false);
+              }}
+              className="text-sm border border-gray-200 rounded-md p-1 focus:outline-hidden text-gray-700"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.flag} {lang.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="border-t border-gray-100 my-2 pt-2">
             {isLoggedIn ? (
               <>

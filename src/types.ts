@@ -21,6 +21,8 @@ export interface Profile {
   settings: ProfileSettings;
   two_factor_enabled?: boolean;
   two_factor_secret?: string;
+  detected_language?: string;
+  known_ips?: string; // stringified list or comma-separated list of safe login IPs
 }
 
 export interface ProfileSettings {

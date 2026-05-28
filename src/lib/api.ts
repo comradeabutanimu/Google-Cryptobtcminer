@@ -68,6 +68,7 @@ export const api = {
   getProfile: () => request<any>('/api/user/profile'),
   updateProfile: (body: any) => request<any>('/api/user/profile/update', { method: 'POST', body: JSON.stringify(body) }),
   changePassword: (body: any) => request<any>('/api/user/change-password', { method: 'POST', body: JSON.stringify(body) }),
+  saveLanguage: (language: string) => request<any>('/api/user/language', { method: 'POST', body: JSON.stringify({ language }) }),
   generate2Fa: () => request<any>('/api/user/generate-2fa', { method: 'POST' }),
   enable2Fa: (body: any) => request<any>('/api/user/enable-2fa', { method: 'POST', body: JSON.stringify(body) }),
   disable2Fa: (body: any) => request<any>('/api/user/disable-2fa', { method: 'POST', body: JSON.stringify(body) }),

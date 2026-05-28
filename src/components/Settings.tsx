@@ -12,10 +12,20 @@ interface SettingsProps {
   profile: Profile;
   onProfileUpdated: (updatedProf: Profile) => void;
   toast: (msg: string, type: 'success' | 'error') => void;
+  initialSegment?: 'profile' | 'security' | 'privacy' | 'notifications';
 }
 
-export default function Settings({ profile, onProfileUpdated, toast }: SettingsProps) {
-  const [activeSegment, setActiveSegment] = useState<'profile' | 'security' | 'privacy' | 'notifications'>('profile');
+export default function Settings({ profile, onProfileUpdated, toast, initialSegment }: SettingsProps) {
+  const [activeSegment, setActiveSegment] = useState<'profile' | 'security' | 'privacy' | 'notifications'>(() => {
+    return initialSegment || 'profile';
+  });
+
+  // Sync activeSegment with initialSegment updates (e.g., when clicking enable 2FA banner)
+  React.useEffect(() => {
+    if (initialSegment) {
+      setActiveSegment(initialSegment);
+    }
+  }, [initialSegment]);
   
   // Profile settings state
   const [fullName, setFullName] = useState(profile.full_name || '');
