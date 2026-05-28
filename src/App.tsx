@@ -30,8 +30,12 @@ import AdminPanel from './components/AdminPanel.tsx';
 
 export default function App() {
   // Navigation & session state
-  const [currentPage, setCurrentPage] = useState<string>('home'); // 'home' | 'login' | 'register' | 'reset-password' | 'dashboard'
-  const [dashboardTab, setDashboardTab] = useState<string>('overview');
+  const [currentPage, setCurrentPage] = useState<string>(() => {
+    return localStorage.getItem('cryptobtc_miner_current_page') || 'home';
+  }); // 'home' | 'login' | 'register' | 'reset-password' | 'dashboard'
+  const [dashboardTab, setDashboardTab] = useState<string>(() => {
+    return localStorage.getItem('cryptobtc_miner_dashboard_tab') || 'overview';
+  });
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
 
@@ -87,6 +91,15 @@ export default function App() {
 
   // Landing page FAQ dropdown state
   const [landingFaqIndex, setLandingFaqIndex] = useState<number | null>(null);
+
+  // Sync page & tab states with localStorage
+  useEffect(() => {
+    localStorage.setItem('cryptobtc_miner_current_page', currentPage);
+  }, [currentPage]);
+
+  useEffect(() => {
+    localStorage.setItem('cryptobtc_miner_dashboard_tab', dashboardTab);
+  }, [dashboardTab]);
 
   // --- FLASH TOAST MESSENGER ---
   const triggerToast = (msg: string, type: 'success' | 'error') => {
@@ -160,7 +173,12 @@ export default function App() {
           if (profileRes.is_admin) {
             setDashboardTab('admin');
           } else {
-            setDashboardTab('overview');
+            const savedTab = localStorage.getItem('cryptobtc_miner_dashboard_tab');
+            if (savedTab) {
+              setDashboardTab(savedTab);
+            } else {
+              setDashboardTab('overview');
+            }
           }
           
           loadDashboardAssets();
@@ -168,6 +186,12 @@ export default function App() {
           clearToken();
           setIsLoggedIn(false);
           setUserProfile(null);
+          setCurrentPage('home');
+        }
+      } else {
+        const savedPage = localStorage.getItem('cryptobtc_miner_current_page');
+        if (savedPage === 'dashboard') {
+          setCurrentPage('home');
         }
       }
     };
