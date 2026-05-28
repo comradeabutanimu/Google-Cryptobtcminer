@@ -28,13 +28,117 @@ import Settings from './components/Settings.tsx';
 import Support from './components/Support.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
 
+interface RouteState {
+  currentPage: string;
+  dashboardTab: string;
+  isDepositModalOpen?: boolean;
+}
+
+const decodePath = (path: string, loggedIn: boolean): RouteState => {
+  const cleanPath = path.toLowerCase().replace(/\/$/, '') || '/';
+  
+  // Public/Landing paths
+  if (cleanPath === '/' || cleanPath === '/home') {
+    return { currentPage: 'home', dashboardTab: 'overview' };
+  }
+  if (cleanPath === '/login') {
+    return { currentPage: 'login', dashboardTab: 'overview' };
+  }
+  if (cleanPath === '/register') {
+    return { currentPage: 'register', dashboardTab: 'overview' };
+  }
+  if (cleanPath === '/reset-password' || cleanPath === '/forgot-password') {
+    return { currentPage: 'reset-password', dashboardTab: 'overview' };
+  }
+
+  // Dashboard/Protected paths
+  if (cleanPath === '/dashboard') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'overview' };
+  }
+  if (cleanPath === '/admin') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'admin' };
+  }
+  if (cleanPath === '/contracts' || cleanPath === '/plans') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'plans' };
+  }
+  if (cleanPath === '/deposits' || cleanPath === '/deposit') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'transactions', isDepositModalOpen: true };
+  }
+  if (cleanPath === '/transactions') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'transactions' };
+  }
+  if (cleanPath === '/withdraw' || cleanPath === '/withdrawal') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'withdraw' };
+  }
+  if (cleanPath === '/notifications') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'notifications' };
+  }
+  if (cleanPath === '/activity-logs') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'activity-logs' };
+  }
+  if (cleanPath === '/referrals' || cleanPath === '/referral') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'referrals' };
+  }
+  if (cleanPath === '/settings') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'settings' };
+  }
+  if (cleanPath === '/support') {
+    return { currentPage: loggedIn ? 'dashboard' : 'login', dashboardTab: 'support' };
+  }
+
+  // Fallback for anything else
+  return { currentPage: 'home', dashboardTab: 'overview' };
+};
+
+const encodeState = (currentPage: string, dashboardTab: string, isDepositModalOpen: boolean): string => {
+  if (currentPage === 'home') return '/';
+  if (currentPage === 'login') return '/login';
+  if (currentPage === 'register') return '/register';
+  if (currentPage === 'reset-password') return '/reset-password';
+  
+  if (currentPage === 'dashboard') {
+    if (isDepositModalOpen) return '/deposits';
+    if (dashboardTab === 'overview') return '/dashboard';
+    if (dashboardTab === 'admin') return '/admin';
+    if (dashboardTab === 'plans') return '/contracts';
+    if (dashboardTab === 'transactions') return '/transactions';
+    if (dashboardTab === 'withdraw') return '/withdraw';
+    if (dashboardTab === 'notifications') return '/notifications';
+    if (dashboardTab === 'activity-logs') return '/activity-logs';
+    if (dashboardTab === 'referrals') return '/referrals';
+    if (dashboardTab === 'settings') return '/settings';
+    if (dashboardTab === 'support') return '/support';
+    return `/dashboard`;
+  }
+  return '/';
+};
+
 export default function App() {
   // Navigation & session state
   const [currentPage, setCurrentPage] = useState<string>(() => {
-    return localStorage.getItem('cryptobtc_miner_current_page') || 'home';
+    const path = window.location.pathname;
+    const cleanPath = path.toLowerCase().replace(/\/$/, '') || '/';
+    if (cleanPath === '/' || cleanPath === '/home') return 'home';
+    if (cleanPath === '/login') return 'login';
+    if (cleanPath === '/register') return 'register';
+    if (cleanPath === '/reset-password' || cleanPath === '/forgot-password') return 'reset-password';
+    return 'dashboard';
   }); // 'home' | 'login' | 'register' | 'reset-password' | 'dashboard'
+
   const [dashboardTab, setDashboardTab] = useState<string>(() => {
-    return localStorage.getItem('cryptobtc_miner_dashboard_tab') || 'overview';
+    const path = window.location.pathname;
+    const cleanPath = path.toLowerCase().replace(/\/$/, '') || '/';
+    if (cleanPath === '/admin') return 'admin';
+    if (cleanPath === '/contracts' || cleanPath === '/plans') return 'plans';
+    if (cleanPath === '/deposits' || cleanPath === '/deposit') return 'transactions';
+    if (cleanPath === '/transactions') return 'transactions';
+    if (cleanPath === '/withdraw' || cleanPath === '/withdrawal') return 'withdraw';
+    if (cleanPath === '/notifications') return 'notifications';
+    if (cleanPath === '/activity-logs') return 'activity-logs';
+    if (cleanPath === '/referrals' || cleanPath === '/referral') return 'referrals';
+    if (cleanPath === '/settings') return 'settings';
+    if (cleanPath === '/support') return 'support';
+    return 'overview';
   });
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
@@ -78,7 +182,11 @@ export default function App() {
 
   // UI state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(() => {
+    const path = window.location.pathname;
+    const cleanPath = path.toLowerCase().replace(/\/$/, '') || '/';
+    return cleanPath === '/deposits' || cleanPath === '/deposit';
+  });
   const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<Plan | null>(null);
   const [alertText, setAlertText] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -92,14 +200,44 @@ export default function App() {
   // Landing page FAQ dropdown state
   const [landingFaqIndex, setLandingFaqIndex] = useState<number | null>(null);
 
-  // Sync page & tab states with localStorage
+  // Sync page & tab states with localStorage and browser path
   useEffect(() => {
+    const newPath = encodeState(currentPage, dashboardTab, isDepositModalOpen);
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
     localStorage.setItem('cryptobtc_miner_current_page', currentPage);
   }, [currentPage]);
 
   useEffect(() => {
+    const newPath = encodeState(currentPage, dashboardTab, isDepositModalOpen);
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
     localStorage.setItem('cryptobtc_miner_dashboard_tab', dashboardTab);
   }, [dashboardTab]);
+
+  useEffect(() => {
+    const newPath = encodeState(currentPage, dashboardTab, isDepositModalOpen);
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
+  }, [isDepositModalOpen]);
+
+  // Listen for browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const decoded = decodePath(window.location.pathname, isLoggedIn);
+      setCurrentPage(decoded.currentPage);
+      setDashboardTab(decoded.dashboardTab);
+      if (decoded.isDepositModalOpen !== undefined) {
+        setIsDepositModalOpen(decoded.isDepositModalOpen);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isLoggedIn]);
 
   // --- FLASH TOAST MESSENGER ---
   const triggerToast = (msg: string, type: 'success' | 'error') => {
@@ -169,15 +307,26 @@ export default function App() {
           setUserProfile(profileRes);
           setIsLoggedIn(true);
           
-          // Default supervisor admin straight to operations center tab immediately
-          if (profileRes.is_admin) {
-            setDashboardTab('admin');
-          } else {
-            const savedTab = localStorage.getItem('cryptobtc_miner_dashboard_tab');
-            if (savedTab) {
-              setDashboardTab(savedTab);
+          // Respect URL path if we are logged in, otherwise route correctly
+          const urlPath = window.location.pathname;
+          const cleanPath = urlPath.toLowerCase().replace(/\/$/, '') || '/';
+          if (cleanPath === '/' || cleanPath === '/home' || cleanPath === '/login' || cleanPath === '/register') {
+            setCurrentPage('dashboard');
+            if (profileRes.is_admin) {
+              setDashboardTab('admin');
             } else {
               setDashboardTab('overview');
+            }
+          } else {
+            const decoded = decodePath(urlPath, true);
+            setCurrentPage(decoded.currentPage);
+            if (profileRes.is_admin && decoded.dashboardTab === 'overview') {
+              setDashboardTab('admin');
+            } else {
+              setDashboardTab(decoded.dashboardTab);
+            }
+            if (decoded.isDepositModalOpen !== undefined) {
+              setIsDepositModalOpen(decoded.isDepositModalOpen);
             }
           }
           
@@ -189,9 +338,13 @@ export default function App() {
           setCurrentPage('home');
         }
       } else {
-        const savedPage = localStorage.getItem('cryptobtc_miner_current_page');
-        if (savedPage === 'dashboard') {
-          setCurrentPage('home');
+        // If they are not logged in, decode the path and force login for protected section paths
+        const urlPath = window.location.pathname;
+        const decoded = decodePath(urlPath, false);
+        setCurrentPage(decoded.currentPage);
+        setDashboardTab(decoded.dashboardTab);
+        if (decoded.isDepositModalOpen !== undefined) {
+          setIsDepositModalOpen(decoded.isDepositModalOpen);
         }
       }
     };
