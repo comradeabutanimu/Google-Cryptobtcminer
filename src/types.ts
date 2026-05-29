@@ -9,6 +9,9 @@ export interface Profile {
   full_name: string;
   btc_balance: number;
   active_plan: string | null;
+  active_plan_investment?: number;
+  active_plan_hash_rate?: number;
+  active_plan_rate?: number;
   plan_activated_at?: string;
   plan_expires_at?: string;
   last_mining_at?: string;

@@ -8,7 +8,7 @@ import {
   BarChart3, Award, Clock, Download, Upload, Bell, Sliders, 
   Users, Settings as SettingsIcon, LifeBuoy, ShieldAlert, Shield, LogOut,
   Menu, X, Sparkles, MessageSquare, Send, Check, AlertTriangle, ChevronDown,
-  Eye, EyeOff, Smartphone, Lock, Globe
+  Eye, EyeOff, Smartphone, Lock, Globe, Loader
 } from 'lucide-react';
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
@@ -168,6 +168,13 @@ export default function App() {
   });
 
   // Custom layout states
+  const [isSignupDetailsLoading, setIsSignupDetailsLoading] = useState(false);
+  const [isSignupOtpLoading, setIsSignupOtpLoading] = useState(false);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [is2faLoading, setIs2faLoading] = useState(false);
+  const [isResetRequestLoading, setIsResetRequestLoading] = useState(false);
+  const [isResetVerifyLoading, setIsResetVerifyLoading] = useState(false);
+
   const [signupStep, setSignupStep] = useState<'details' | 'otp'>('details');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupName, setSignupName] = useState('');
@@ -532,10 +539,12 @@ export default function App() {
     }
 
     // IsLoggedIn: Paid plan. Offer direct balance purchase if enough balance, or external invoices
-    if (userProfile && userProfile.btc_balance >= plan.price_btc) {
+    const btcRate = btcPrice?.btc_usd || 68420;
+    const priceInBtc = plan.price_btc / btcRate;
+    if (userProfile && userProfile.btc_balance >= priceInBtc) {
       const confirmPurchase = window.confirm(
         `You have enough account balance (${userProfile.btc_balance.toFixed(8)} BTC) to activate the ${plan.name} plan directly.\n\n` +
-        `Would you like to purchase and activate the ${plan.name} miner right now for ${plan.price_btc} BTC? \n` +
+        `Would you like to purchase and activate the ${plan.name} miner right now for ${priceInBtc.toFixed(6)} BTC (equivalent to $${plan.price_btc.toLocaleString()} USDT)? \n` +
         `(Duration: ${plan.duration_days} Days, Hash power: ${plan.hash_rate})\n\n` +
         `Press OK to purchase instantly using your balance, or Cancel to open the deposit/pay external invoice modal.`
       );
@@ -580,9 +589,9 @@ export default function App() {
       const lower = userMsg.toLowerCase();
       
       if (lower.includes('deposit') || lower.includes('pay') || lower.includes('invoice')) {
-        responseText = "To purchase a paid contract, click 'Buy Plan' on any card inside your dashboard. It raises an automated NOWPayments invoice displaying a dedicated BTC receiving address + barcode.";
+        responseText = "To purchase a paid contract, click 'Buy Plan' on any card inside your dashboard. It raises an automated NOWPayments invoice displaying a dedicated USDT receiving address + barcode.";
       } else if (lower.includes('withdraw') || lower.includes('cashout') || lower.includes('receive')) {
-        responseText = "Minimum withdrawal is 0.0005 BTC. Submit requests in the Withdraw panel. Transactions clear in 1-4 hours following security compliance checks.";
+        responseText = "Minimum withdrawal is 0.0001 BTC. Submit requests in the Withdraw panel. Transactions clear in 1-4 hours following security compliance checks.";
       } else if (lower.includes('payout') || lower.includes('mine') || lower.includes('daily')) {
         responseText = "Miner nodes payout dividends incrementally every 2 minutes. You can monitor actual earnings ticking live on your overview charts.";
       } else if (lower.includes('comrade') || lower.includes('abutanimu')) {
@@ -650,7 +659,7 @@ export default function App() {
 
                   {/* Subtitle */}
                   <p className="max-w-xl mx-auto text-base sm:text-[18px] text-[#4B5563] font-medium leading-relaxed">
-                    Skip the hardware. Skip the electricity bills. Pick a plan, deposit BTC, and watch your balance grow with zero technical effort.
+                    Skip the hardware. Skip the electricity bills. Pick a plan, deposit USDT, and watch your BTC balance grow with zero technical effort.
                   </p>
 
                   {/* Hero Actions Rounded Pills */}
@@ -659,7 +668,7 @@ export default function App() {
                       onClick={() => setCurrentPage('register')}
                       className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#F97316] hover:bg-[#EA580C] font-semibold text-sm text-white shadow-xs hover:shadow-md transition-all cursor-pointer text-center"
                     >
-                      Start mining free
+                      Start mining now
                     </button>
                     <button
                       onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
@@ -678,8 +687,8 @@ export default function App() {
                           ⚙
                         </div>
                       </div>
-                      <div className="text-3xl font-bold mb-2 font-mono tracking-tight text-white">0.02485900 BTC</div>
-                      <div className="text-base text-[#F97316] font-extrabold mb-6">≈ $1,592.42 USD</div>
+                      <div className="text-3xl font-bold mb-2 font-mono tracking-tight text-white">2.59242 BTC</div>
+                      <div className="text-base text-[#F97316] font-extrabold mb-6">≈ $172,500.00 USD</div>
                       
                       {/* Bars chart */}
                       <div className="h-16 flex items-end gap-2 mb-6">
@@ -714,7 +723,7 @@ export default function App() {
 
                   {/* Card 2 */}
                   <div className="text-center border-l border-[#E7E7E4]">
-                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">12.84 BTC</span>
+                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">14.28 BTC</span>
                     <span className="block text-xs text-[#6B7280] font-bold uppercase tracking-widest">Mined Daily</span>
                   </div>
 
@@ -750,7 +759,7 @@ export default function App() {
                       </div>
                       <h3 className="text-lg font-bold text-gray-900">Choose a Plan</h3>
                       <p className="text-sm text-gray-500 leading-relaxed">
-                        Assess our clear mining tariffs or input custom hashing rates. Paid nodes start at 0.005 BTC with up to 180 days maturity terms.
+                        Assess our clear mining tariffs or input custom hashing rates. Paid nodes start at 500 USDT with up to 180 days maturity terms.
                       </p>
                     </div>
 
@@ -759,7 +768,7 @@ export default function App() {
                       <div className="w-12 h-12 bg-orange-500 rounded-full text-white font-extrabold flex items-center justify-center shadow-xs">
                         2
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900">Deposit BTC</h3>
+                      <h3 className="text-lg font-bold text-gray-900">Deposit USDT</h3>
                       <p className="text-sm text-gray-500 leading-relaxed">
                         Transmit your coin payment using our secure NOWPayments invoice screens, or test easily using sandbox credits first.
                       </p>
@@ -850,7 +859,7 @@ export default function App() {
                         {[...Array(5)].map((_, i) => <span key={i} className="text-lg">★</span>)}
                       </div>
                       <p className="text-sm text-gray-600 leading-relaxed italic font-medium">
-                        "Our VIP mining contract provides exceptional 0.0035 BTC daily payout. Security, and payouts are smooth. Professional grade team."
+                        "Our VIP mining contract provides exceptional BTC daily payouts. Security, and payouts are smooth. Professional grade team."
                       </p>
                       <div>
                         <strong className="block text-sm text-gray-950">Diego R.</strong>
@@ -872,7 +881,7 @@ export default function App() {
 
                   <div className="space-y-4">
                     {[
-                      { q: 'Is there any minimum deposit sum?', a: 'Standard deposits initiate at 0.005 BTC to purchase mining nodes. Custom sandbox invoices can use test amounts starting at 0.001 BTC.' },
+                      { q: 'Is there any minimum deposit sum?', a: 'Standard deposits initiate at 500 USDT to purchase mining nodes. Custom sandbox invoices can use test amounts starting at 10 USDT.' },
                       { q: 'Can I terminate mining contracts early?', a: 'Clouds contracts are locked for plan durations (30 to 180 days) as we allocate active ASIC computer cards physically in containers.' },
                       { q: 'How is security maintained against web leaks?', a: 'Client logins, and wallets databases operate behind TLS tunnels. Critical balances are securely isolated.' }
                     ].map((item, index) => {
@@ -883,7 +892,7 @@ export default function App() {
                             onClick={() => setLandingFaqIndex(isOpen ? null : index)}
                             className="w-full text-left p-5 text-sm font-bold text-gray-950 flex justify-between items-center cursor-pointer"
                           >
-                            <span>{item.q}</span>
+                             <span>{item.q}</span>
                             <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                           </button>
                           {isOpen && (
@@ -901,7 +910,7 @@ export default function App() {
               {/* CTA BANNER */}
               <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-[#1C1917] rounded-3xl p-8 sm:p-16 text-center text-white space-y-6 border border-neutral-800 shadow-xl relative overflow-hidden">
-                  <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Start earning BTC today</h2>
+                  <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Start earning Bitcoin today</h2>
                   <p className="text-sm text-neutral-400 max-w-md mx-auto">Register in minutes, deposit securely, and launch active block hashing nodes instantly.</p>
                   <button
                     onClick={() => setCurrentPage('register')}
@@ -935,6 +944,8 @@ export default function App() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
+                        if (isSignupDetailsLoading) return;
+                        setIsSignupDetailsLoading(true);
                         const formdata = new FormData(e.currentTarget);
                         const name = formdata.get('name') as string;
                         const email = formdata.get('email') as string;
@@ -956,6 +967,8 @@ export default function App() {
                           triggerToast('Verification OTP generated and sent to email!', 'success');
                         } catch (err: any) {
                           triggerToast(err.message || 'Error initiating account signup.', 'error');
+                        } finally {
+                          setIsSignupDetailsLoading(false);
                         }
                       }}
                       className="space-y-4"
@@ -997,9 +1010,17 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center"
+                        disabled={isSignupDetailsLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:bg-orange-500/65 disabled:cursor-not-allowed select-none"
                       >
-                        Request registration OTP code
+                        {isSignupDetailsLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Request registration OTP code</span>
+                        )}
                       </button>
                     </form>
                   </>
@@ -1089,9 +1110,11 @@ export default function App() {
 
                       <button
                         onClick={async () => {
+                          if (isSignupOtpLoading) return;
                           if (!signupCodeInput || signupCodeInput.trim().length !== 6) {
                             return triggerToast('Please enter the complete 6-digit OTP code.', 'error');
                           }
+                          setIsSignupOtpLoading(true);
                           try {
                             const res = await api.verifySignupOtp({ email: signupEmail, otp: signupCodeInput });
                             setToken(res.token);
@@ -1109,11 +1132,21 @@ export default function App() {
                             loadDashboardAssets();
                           } catch (err: any) {
                             triggerToast(err.message || 'OTP verification declined. Please try again.', 'error');
+                          } finally {
+                            setIsSignupOtpLoading(false);
                           }
                         }}
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center block"
+                        disabled={isSignupOtpLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:bg-orange-500/65 disabled:cursor-not-allowed select-none"
                       >
-                        Verify Code & Start mining
+                        {isSignupOtpLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Verify Code & Start mining</span>
+                        )}
                       </button>
 
                       <button
@@ -1157,6 +1190,8 @@ export default function App() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
+                        if (is2faLoading) return;
+                        setIs2faLoading(true);
                         try {
                           const res = await api.verify2FaLogin({
                             email: login2faEmail,
@@ -1179,6 +1214,8 @@ export default function App() {
                           loadDashboardAssets();
                         } catch (err: any) {
                           triggerToast(err.message || 'The specified 2FA code is invalid.', 'error');
+                        } finally {
+                          setIs2faLoading(false);
                         }
                       }}
                       className="space-y-4"
@@ -1199,10 +1236,17 @@ export default function App() {
 
                       <button
                         type="submit"
-                        disabled={login2faCode.length !== 6}
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center block disabled:opacity-50"
+                        disabled={login2faCode.length !== 6 || is2faLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed select-none"
                       >
-                        Verify & Secure Access
+                        {is2faLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Verify & Secure Access</span>
+                        )}
                       </button>
 
                       <button
@@ -1232,6 +1276,8 @@ export default function App() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
+                        if (isLoginLoading) return;
+                        setIsLoginLoading(true);
                         const formdata = new FormData(e.currentTarget);
                         const email = formdata.get('email') as string;
                         const password = formdata.get('password') as string;
@@ -1261,6 +1307,8 @@ export default function App() {
                           loadDashboardAssets();
                         } catch (err: any) {
                           triggerToast(err.message || 'Login details invalid.', 'error');
+                        } finally {
+                          setIsLoginLoading(false);
                         }
                       }}
                       className="space-y-4"
@@ -1307,9 +1355,17 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center"
+                        disabled={isLoginLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:bg-orange-500/65 disabled:cursor-not-allowed select-none"
                       >
-                        Sign in
+                        {isLoginLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Sign in</span>
+                        )}
                       </button>
                     </form>
 
@@ -1343,6 +1399,8 @@ export default function App() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
+                        if (isResetRequestLoading) return;
+                        setIsResetRequestLoading(true);
                         const formdata = new FormData(e.currentTarget);
                         const emailInput = formdata.get('requestEmail') as string;
                         try {
@@ -1354,6 +1412,8 @@ export default function App() {
                           triggerToast('Password reset validation code successfully generated!', 'success');
                         } catch (err: any) {
                           triggerToast(err.message || 'Error occurred starting reset process.', 'error');
+                        } finally {
+                          setIsResetRequestLoading(false);
                         }
                       }}
                       className="space-y-4"
@@ -1365,9 +1425,17 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center block font-sans"
+                        disabled={isResetRequestLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:bg-orange-500/65 disabled:cursor-not-allowed select-none"
                       >
-                        Request Recovery OTP Code
+                        {isResetRequestLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Request Recovery OTP Code</span>
+                        )}
                       </button>
 
                       <button
@@ -1394,14 +1462,18 @@ export default function App() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
+                        if (isResetVerifyLoading) return;
+                        setIsResetVerifyLoading(true);
                         const formdata = new FormData(e.currentTarget);
                         const pass = formdata.get('password') as string;
                         const confirmPass = formdata.get('confirm') as string;
 
                         if (resetCodeInput.trim().length !== 6) {
+                          setIsResetVerifyLoading(false);
                           return triggerToast('Please enter the complete 6-digit verification code.', 'error');
                         }
                         if (pass !== confirmPass) {
+                          setIsResetVerifyLoading(false);
                           return triggerToast('Confirm password values mismatched.', 'error');
                         }
 
@@ -1412,6 +1484,8 @@ export default function App() {
                           setCurrentPage('login');
                         } catch (err: any) {
                           triggerToast(err.message || 'OTP verification verification error. Please retry.', 'error');
+                        } finally {
+                          setIsResetVerifyLoading(false);
                         }
                       }}
                       className="space-y-4"
@@ -1515,9 +1589,17 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center block"
+                        disabled={isResetVerifyLoading}
+                        className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-[#EA580C] rounded-full font-bold text-white text-xs cursor-pointer shadow-xs hover:shadow-md transition-all text-center flex items-center justify-center space-x-2 disabled:bg-orange-500/65 disabled:cursor-not-allowed select-none"
                       >
-                        Reset password
+                        {isResetVerifyLoading ? (
+                          <>
+                            <Loader className="animate-spin h-3.5 w-3.5" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <span>Reset password</span>
+                        )}
                       </button>
 
                       <button
@@ -1547,7 +1629,7 @@ export default function App() {
               <div className="px-6 cursor-pointer" onClick={() => setCurrentPage('home')}>
                 <div className="flex items-center space-x-2">
                   <div className="w-8.5 h-8.5 bg-orange-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-lg font-bold">₿</span>
+                    <span className="text-white text-base font-extrabold">₿</span>
                   </div>
                   <span className="text-lg font-bold tracking-tight">
                     <span className="text-gray-900">CryptoBTC</span>
@@ -1838,7 +1920,7 @@ export default function App() {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-8 h-8 bg-orange-500 rounded-full flex justify-center items-center">
-                      <span className="text-white text-base font-bold">₿</span>
+                      <span className="text-white text-sm font-extrabold">₿</span>
                     </div>
                     <span className="font-extrabold text-gray-900 text-base">CryptoBTC Miner</span>
                   </div>

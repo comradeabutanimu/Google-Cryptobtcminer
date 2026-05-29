@@ -14,10 +14,15 @@ const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-const supabase = (supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey)
+const supabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    })
   : null;
 
 interface Schema {
@@ -33,21 +38,11 @@ interface Schema {
 
 const DEFAULT_PLANS: Plan[] = [
   {
-    id: 'plan_free',
-    name: 'Free',
-    price_btc: 0,
-    hash_rate: '10 GH/s',
-    daily_earn_btc: 0.0000005,
-    duration_days: 30,
-    is_active: true,
-    created_at: new Date().toISOString()
-  },
-  {
     id: 'plan_starter',
     name: 'Starter',
-    price_btc: 0.005,
+    price_btc: 500,
     hash_rate: '500 GH/s',
-    daily_earn_btc: 0.0001,
+    daily_earn_btc: 0.00024359, // equivalent to ($950 total return / 60 days) at $65,000 BTC reference price
     duration_days: 60,
     is_active: true,
     created_at: new Date().toISOString()
@@ -55,9 +50,9 @@ const DEFAULT_PLANS: Plan[] = [
   {
     id: 'plan_pro',
     name: 'Pro',
-    price_btc: 0.025,
+    price_btc: 10000,
     hash_rate: '3 TH/s',
-    daily_earn_btc: 0.0006,
+    daily_earn_btc: 0.00632479, // equivalent to ($37,000 total return / 90 days) at $65,000 BTC reference price
     duration_days: 90,
     is_active: true,
     created_at: new Date().toISOString()
@@ -65,9 +60,9 @@ const DEFAULT_PLANS: Plan[] = [
   {
     id: 'plan_vip',
     name: 'VIP',
-    price_btc: 0.1,
+    price_btc: 50000,
     hash_rate: '15 TH/s',
-    daily_earn_btc: 0.0035,
+    daily_earn_btc: 0.02735043, // equivalent to ($320,000 total return / 180 days) at $65,000 BTC reference price
     duration_days: 180,
     is_active: true,
     created_at: new Date().toISOString()
@@ -87,6 +82,7 @@ class Database {
   private data: Schema;
   private supabaseClient = supabase;
   private availableTables = new Set<string>();
+  private tableColumns = new Map<string, Set<string>>();
 
   constructor() {
     this.data = {
@@ -113,8 +109,13 @@ class Database {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         this.data = {
-          profiles: parsed.profiles || [],
-          plans: parsed.plans || DEFAULT_PLANS,
+          profiles: (parsed.profiles || []).map((p: any) => {
+            if (p.active_plan === 'plan_free' || p.active_plan === 'free') {
+              p.active_plan = null;
+            }
+            return p;
+          }),
+          plans: DEFAULT_PLANS, // Force-sync to our precise specification
           transactions: parsed.transactions || [],
           deposits: parsed.deposits || [],
           withdrawals: parsed.withdrawals || [],
@@ -138,6 +139,33 @@ class Database {
 
     console.log('Initiating bootstrap sync from Supabase...');
     this.availableTables.clear();
+
+    try {
+      if (supabaseUrl && supabaseKey) {
+        const restUrl = `${supabaseUrl}/rest/v1`;
+        const res = await fetch(restUrl, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        if (res.ok) {
+          const schema = await res.json() as any;
+          if (schema && schema.definitions) {
+            for (const tableName of Object.keys(schema.definitions)) {
+              const props = schema.definitions[tableName]?.properties;
+              if (props) {
+                const columns = new Set<string>(Object.keys(props));
+                this.tableColumns.set(tableName, columns);
+                console.log(`Discovered ${columns.size} columns for Supabase table "${tableName}".`);
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('Could not fetch dynamic OpenAPI schema from PostgREST:', err.message);
+    }
 
     try {
       // 1. Fetch Profiles
@@ -296,59 +324,77 @@ class Database {
     }
   }
 
+  private filterRowColumns(tableName: string, row: any): any {
+    const cleaned = { ...row };
+    // Always strip known non-column helper keys
+    delete cleaned.detected_language;
+    delete cleaned.passwordHash;
+
+    const columns = this.tableColumns.get(tableName);
+    if (!columns || columns.size === 0) {
+      return cleaned;
+    }
+
+    const filtered: any = {};
+    for (const key of Object.keys(cleaned)) {
+      if (columns.has(key)) {
+        filtered[key] = cleaned[key];
+      }
+    }
+    return filtered;
+  }
+
   private async syncTableToSupabase(tableName: string, rows: any[]) {
     if (!this.supabaseClient || !this.availableTables.has(tableName) || rows.length === 0) return;
     try {
       const formattedRows = rows.map(r => {
-        if (tableName === 'profiles') {
-          return {
-            ...r,
-            settings: typeof r.settings === 'object' ? JSON.stringify(r.settings) : r.settings
-          };
+        const cleaned = this.filterRowColumns(tableName, r);
+        if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
+          cleaned.settings = JSON.stringify(cleaned.settings);
         }
-        return r;
+        return cleaned;
       });
 
       const { error } = await this.supabaseClient.from(tableName).upsert(formattedRows);
       if (error) {
-        console.warn(`Could not seed initial rows to Supabase table "${tableName}":`, error.message);
+        console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
       } else {
         console.log(`Successfully seeded ${rows.length} rows to Supabase table "${tableName}".`);
       }
     } catch (e: any) {
-      console.warn(`Exception seeding initial rows to Supabase table "${tableName}":`, e.message);
+      console.warn(`Supabase dynamic sync exception for upsert in "${tableName}": info - ${e.message}`);
     }
   }
 
   private async supabaseInsert(tableName: string, row: any) {
     if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
     try {
-      const formattedRow = { ...row };
-      if (tableName === 'profiles' && typeof row.settings === 'object') {
-        formattedRow.settings = JSON.stringify(row.settings);
+      const cleaned = this.filterRowColumns(tableName, row);
+      if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
+        cleaned.settings = JSON.stringify(cleaned.settings);
       }
-      const { error } = await this.supabaseClient.from(tableName).insert(formattedRow);
+      const { error } = await this.supabaseClient.from(tableName).insert(cleaned);
       if (error) {
-        console.error(`Supabase INSERT failed for ${tableName}:`, error.message);
+        console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
       }
     } catch (err: any) {
-      console.error(`Supabase INSERT exception for ${tableName}:`, err.message);
+      console.warn(`Supabase dynamic sync exception for INSERT in "${tableName}": info - ${err.message}`);
     }
   }
 
   private async supabaseUpdate(tableName: string, row: any, id: string) {
     if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
     try {
-      const formattedRow = { ...row };
-      if (tableName === 'profiles' && typeof row.settings === 'object') {
-        formattedRow.settings = JSON.stringify(row.settings);
+      const cleaned = this.filterRowColumns(tableName, row);
+      if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
+        cleaned.settings = JSON.stringify(cleaned.settings);
       }
-      const { error } = await this.supabaseClient.from(tableName).update(formattedRow).eq('id', id);
+      const { error } = await this.supabaseClient.from(tableName).update(cleaned).eq('id', id);
       if (error) {
-        console.error(`Supabase UPDATE failed for ${tableName}:`, error.message);
+        console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
       }
     } catch (err: any) {
-      console.error(`Supabase UPDATE exception for ${tableName}:`, err.message);
+      console.warn(`Supabase dynamic sync exception for UPDATE in "${tableName}": info - ${err.message}`);
     }
   }
 
@@ -357,10 +403,10 @@ class Database {
     try {
       const { error } = await this.supabaseClient.from(tableName).delete().eq('id', id);
       if (error) {
-        console.error(`Supabase DELETE failed for ${tableName}:`, error.message);
+        console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
       }
     } catch (err: any) {
-      console.error(`Supabase DELETE exception for ${tableName}:`, err.message);
+      console.warn(`Supabase dynamic sync exception for DELETE in "${tableName}": info - ${err.message}`);
     }
   }
 

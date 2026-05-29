@@ -74,10 +74,10 @@ export default function Support() {
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Email Support</span>
             </div>
             <div>
-              <a href="mailto:support@cryptobtc-miner.com" className="text-sm font-bold text-gray-900 hover:text-orange-500 transition-colors">
-                support@cryptobtc-miner.com
+              <a href="mailto:support@cyptobtcminer.com" className="text-sm font-bold text-gray-900 hover:text-orange-500 transition-colors">
+                support@cyptobtcminer.com
               </a>
-              <span className="text-[10px] text-gray-400 mt-1 block">Replies within 15 minutes</span>
+              <span className="text-[10px] text-gray-400 mt-1 block">Replies within 24 hours</span>
             </div>
           </div>
 

@@ -69,15 +69,13 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
                 <span className={`text-3xl font-extrabold tracking-tight ${
                   isActive ? 'text-white' : isPro ? 'text-white' : isDashboard ? 'text-[#1A1A1A]' : 'text-white'
                 }`}>
-                  {plan.price_btc === 0 ? 'Free' : `${plan.price_btc} BTC`}
+                  {plan.price_btc.toLocaleString()} USDT
                 </span>
-                {plan.price_btc > 0 && (
-                  <span className={`text-xs ml-1 font-medium ${
-                    isPro || isActive ? 'text-white/70' : isDashboard ? 'text-gray-500' : 'text-neutral-400'
-                  }`}>
-                    contract
-                  </span>
-                )}
+                <span className={`text-xs ml-1 font-medium ${
+                  isPro || isActive ? 'text-white/70' : isDashboard ? 'text-gray-500' : 'text-neutral-400'
+                }`}>
+                  contract
+                </span>
               </div>
 
               {/* Divider */}
@@ -86,7 +84,7 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
               }`} />
 
               {/* Specifications List */}
-              <ul className="space-y-4">
+              <ul className="space-y-3.5">
                 <li className="flex items-center space-x-3 text-sm">
                   <Zap className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`} />
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
@@ -96,13 +94,31 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
                 <li className="flex items-center space-x-3 text-sm">
                   <TrendingUp className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`} />
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
-                    Earns: <strong>{plan.daily_earn_btc.toFixed(8)} BTC</strong> / day
+                    Daily Return: <strong>{plan.id === 'plan_starter' ? '1.5%' : '3%'} / day</strong>
+                  </span>
+                </li>
+                <li className={`flex items-center space-x-3 text-sm ${isPro || isActive ? 'text-emerald-200' : 'text-emerald-600'}`}>
+                  <TrendingUp className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-emerald-200' : 'text-emerald-500'}`} />
+                  <span>
+                    Daily Profit: <strong>{plan.id === 'plan_starter' ? '$7.50/day' : plan.id === 'plan_pro' ? '$300.00/day' : '$1,500.00/day'}</strong>
                   </span>
                 </li>
                 <li className="flex items-center space-x-3 text-sm">
                   <Calendar className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`} />
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
                     Duration: <strong>{plan.duration_days} days</strong>
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3 text-sm">
+                  <span className={`h-4 w-4 shrink-0 flex items-center justify-center font-extrabold text-xs leading-none ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`}>$</span>
+                  <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
+                    Total Profit: <strong>{plan.id === 'plan_starter' ? '$450 USDT' : plan.id === 'plan_pro' ? '$27,000 USDT' : '$270,000 USDT'}</strong>
+                  </span>
+                </li>
+                <li className={`flex items-center space-x-3 text-sm border-t border-dashed pt-2.5 mt-2.5 ${isPro || isActive ? 'border-white/20' : 'border-[#E7E7E4]'}`}>
+                  <span className={`h-4 w-4 shrink-0 flex items-center justify-center font-extrabold text-xs leading-none ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`}>Σ</span>
+                  <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
+                    Total Return: <strong>{plan.id === 'plan_starter' ? '$950' : plan.id === 'plan_pro' ? '$37,000' : '$320,000'}</strong> <span className="text-[10px] opacity-75 font-normal">(capital + profit)</span>
                   </span>
                 </li>
               </ul>
@@ -130,7 +146,7 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
                       : 'bg-[#F97316] text-white hover:bg-[#EA580C]'
                   }`}
                 >
-                  {plan.price_btc === 0 ? 'Activate Free Plan' : 'Choose Plan'}
+                  Choose Plan
                 </button>
               )}
             </div>

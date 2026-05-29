@@ -91,6 +91,52 @@ async function startServer() {
     next();
   });
 
+  let cachedBtcPrice = 68420.0;
+  let lastBtcFetchAt = 0;
+
+  async function updateCachedBtcPrice() {
+    const now = Date.now();
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.bitcoin?.usd) {
+          cachedBtcPrice = Number(data.bitcoin.usd);
+          lastBtcFetchAt = now;
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  function activateDynamicPlanForUser(user: any, amountUsd: number) {
+    let planId = 'plan_starter';
+    let rate = 0.015;
+    let durationDays = 60;
+    let hashRateGhs = Math.round(amountUsd);
+
+    if (amountUsd >= 50000) {
+      planId = 'plan_vip';
+      rate = 0.03;
+      durationDays = 180;
+      hashRateGhs = Math.round(amountUsd / 3);
+    } else if (amountUsd >= 10000) {
+      planId = 'plan_pro';
+      rate = 0.03;
+      durationDays = 90;
+      hashRateGhs = Math.round(amountUsd / 3);
+    }
+
+    user.active_plan = planId;
+    user.active_plan_investment = amountUsd;
+    user.active_plan_rate = rate;
+    user.active_plan_hash_rate = hashRateGhs;
+    user.plan_activated_at = new Date().toISOString();
+    user.plan_expires_at = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    user.last_mining_at = new Date().toISOString();
+  }
+
   const processMining = (user: any) => {
     if (user.is_suspended || !user.active_plan) {
       return;
@@ -98,7 +144,11 @@ async function startServer() {
 
     const plansList = db.getPlans();
     const userPlan = plansList.find(p => p.id === user.active_plan);
-    if (!userPlan || !userPlan.is_active) {
+    
+    // Check if it is a dynamic contract
+    const isDynamicContract = !!(user.active_plan_investment && user.active_plan_rate);
+
+    if (!isDynamicContract && (!userPlan || !userPlan.is_active)) {
       return;
     }
 
@@ -109,7 +159,10 @@ async function startServer() {
       user.plan_activated_at = user.created_at || new Date().toISOString();
     }
     if (!user.plan_expires_at) {
-      const planDurationMs = userPlan.duration_days * 24 * 60 * 60 * 1000;
+      const durationDays = isDynamicContract 
+        ? (user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180) 
+        : (userPlan?.duration_days || 60);
+      const planDurationMs = durationDays * 24 * 60 * 60 * 1000;
       const startMs = new Date(user.plan_activated_at).getTime();
       user.plan_expires_at = new Date(startMs + planDurationMs).toISOString();
     }
@@ -131,8 +184,18 @@ async function startServer() {
     const elapsedMs = activeEnd - lastTime;
 
     if (elapsedMs > 0) {
-      const dailyEarn = userPlan.daily_earn_btc;
+      let dailyEarn = 0;
+      if (isDynamicContract) {
+        dailyEarn = (user.active_plan_investment * user.active_plan_rate) / cachedBtcPrice;
+      } else {
+        dailyEarn = userPlan?.daily_earn_btc || 0;
+      }
+
       const earned = elapsedMs * (dailyEarn / 86400000);
+
+      const planName = isDynamicContract 
+        ? (user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
+        : (userPlan?.name || 'USDT Miner');
 
       if (earned > 0.00000001) {
         user.btc_balance = Number((user.btc_balance + earned).toFixed(8));
@@ -141,7 +204,7 @@ async function startServer() {
           id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
           user_id: user.id,
           type: 'mining',
-          description: `Cloud mining payout block term (${userPlan.name})`,
+          description: `Cloud mining payout block term (${planName})`,
           amount_btc: Number(earned.toFixed(8)),
           status: 'completed',
           created_at: new Date(activeEnd).toISOString()
@@ -162,11 +225,17 @@ async function startServer() {
     // Turn off plan if we reached raw expiration
     if (now >= expiryTime) {
       user.active_plan = null;
+      const planName = isDynamicContract 
+        ? (user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
+        : (userPlan?.name || 'USDT Miner');
+      const durationDays = isDynamicContract 
+        ? (user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180) 
+        : (userPlan?.duration_days || 60);
 
       db.addNotification({
         id: 'not_exp_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
-        message: `Your cloud mining contract (${userPlan.name}) has reached its maturity term of ${userPlan.duration_days} days and stopped. Activate Free plan or buy a new contract to continue.`,
+        message: `Your cloud mining contract (${planName}) has reached its maturity term of ${durationDays} days and stopped. Buy a new contract to continue.`,
         is_read: false,
         created_at: new Date(expiryTime).toISOString()
       });
@@ -175,7 +244,7 @@ async function startServer() {
         id: 'act_exp_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
         action: 'Contract Expired',
-        details: `Your cloud mining contract (${userPlan.name}) has expired after ${userPlan.duration_days} days.`,
+        details: `Your cloud mining contract (${planName}) has expired after ${durationDays} days.`,
         created_at: new Date(expiryTime).toISOString()
       });
     }
@@ -248,6 +317,7 @@ async function startServer() {
   // OTP Pending Registries map
   const pendingRegistrations = new Map<string, { otp: string; data: any; expiresAt: number }>();
   const forgotPasswordOtps = new Map<string, { otp: string; expiresAt: number }>();
+  const lastForgotPasswordRequest = new Map<string, number>();
 
   // Auth: Send Signup OTP
   app.post('/api/auth/send-otp', async (req, res) => {
@@ -279,7 +349,7 @@ async function startServer() {
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
           <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
-            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">USDT</span>MINER
           </div>
           <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
             Register Account Verification
@@ -296,7 +366,7 @@ async function startServer() {
               ${otp}
             </div>
             <div style="font-size: 12px; color: #A8A29E; margin-top: 8px;">
-              Expires in exactly 15 minutes.
+               Expires in exactly 15 minutes.
             </div>
           </div>
           
@@ -305,18 +375,37 @@ async function startServer() {
           </p>
           
           <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
-            If you did not initiate this activation request, please immediately ignore this message or report it directly to <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
+            If you did not initiate this activation request, please immediately ignore this message or report it directly to <a href="mailto:support@cryptousdtminer.com" style="color: #F97316; text-decoration: none;">support@cryptousdtminer.com</a>.
           </div>
         </div>
       </div>
     `;
 
-    // Ensure the email is successfully sent to the inbox before confirming
-    await sendEmail(email.toLowerCase().trim(), "Verify Your Crypto BTC Miner Registration", emailHtml);
+    // Ensure email is sent immediately after user submits registration form with 3x retry mechanism
+    let emailSent = false;
+    let attemptsCount = 0;
+    while (attemptsCount < 3) {
+      attemptsCount++;
+      console.log(`[SMTP] Registration verification email attempt ${attemptsCount}/3 for ${email}`);
+      const stepRes = await sendEmail(email.toLowerCase().trim(), "Verify Your Crypto USDT Miner Registration", emailHtml);
+      if (stepRes && stepRes.success) {
+        emailSent = true;
+        break;
+      }
+      if (attemptsCount < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+
+    if (!emailSent) {
+      return res.status(500).json({ 
+        error: 'Failed to send verification email. Please check your email address or try again.' 
+      });
+    }
 
     res.json({ 
       success: true, 
-      message: 'A 6-digit registration verification OTP has been emailed successfully!', 
+      message: `Verification email sent to ${email.toLowerCase().trim()}`, 
       email: email.toLowerCase().trim()
     });
 
@@ -367,15 +456,16 @@ async function startServer() {
       }
     }
 
+    // New user plan: NO default active plan assigned (set to null)
     const newProfile: Profile & { passwordHash: string } = {
       id: userId,
       email: emailKey,
       full_name: name,
       btc_balance: 0.00000000,
-      active_plan: 'plan_free',
-      plan_activated_at: new Date().toISOString(),
-      plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      last_mining_at: new Date().toISOString(),
+      active_plan: null, // NO default active plan
+      plan_activated_at: undefined,
+      plan_expires_at: undefined,
+      last_mining_at: undefined,
       is_admin: false,
       is_suspended: false,
       referral_code: refCode,
@@ -396,7 +486,7 @@ async function startServer() {
     if (referredBy) {
       const referrer = profiles.find(p => p.id === referredBy);
       if (referrer) {
-        referrer.btc_balance += 0.0001;
+        referrer.btc_balance += 10.00; // Credit 10 USDT
         db.updateProfile(referrer);
 
         db.addTransaction({
@@ -404,7 +494,7 @@ async function startServer() {
           user_id: referrer.id,
           type: 'referral',
           description: `Referral bonus for inviting ${name}`,
-          amount_btc: 0.0001,
+          amount_btc: 10.00,
           status: 'completed',
           created_at: new Date().toISOString()
         });
@@ -412,7 +502,7 @@ async function startServer() {
         db.addNotification({
           id: 'not_' + Math.random().toString(36).substr(2, 9),
           user_id: referrer.id,
-          message: `Congratulations! Ref bonus for inviting ${name} (+0.0001 BTC) is credited.`,
+          message: `Congratulations! Referral bonus for inviting ${name} (+10.00 USDT) is credited.`,
           is_read: false,
           created_at: new Date().toISOString()
         });
@@ -421,22 +511,11 @@ async function startServer() {
 
     db.addProfile(newProfile);
 
-    // Initial Transaction for Free Plan
-    db.addTransaction({
-      id: 'tx_init_free',
-      user_id: userId,
-      type: 'mining',
-      description: 'Free starter plan activated (10 GH/s)',
-      amount_btc: 0,
-      status: 'completed',
-      created_at: new Date().toISOString()
-    });
-
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: userId,
       action: 'Registration (OTP Verified)',
-      details: `Account created and verified for ${emailKey}. Referred by code: ${referralCode || 'None'}. Free plan loaded.`,
+      details: `Account created and verified for ${emailKey}. Referred by code: ${referralCode || 'None'}. Plan state is inactive, ready to purchase.`,
       created_at: new Date().toISOString()
     });
 
@@ -833,8 +912,9 @@ async function startServer() {
     if (!email) {
       return res.status(400).json({ error: 'Email address is required' });
     }
+    const emailKey = email.toLowerCase().trim();
     const profiles = db.getProfiles();
-    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase().trim());
+    const user = profiles.find(p => p.email.toLowerCase() === emailKey);
     
     if (!user) {
       return res.status(404).json({ error: 'No account found with that email address.' });
@@ -844,10 +924,21 @@ async function startServer() {
       return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
     }
 
+    // Cooldown timer (60 seconds) check
+    const lastRequest = lastForgotPasswordRequest.get(emailKey);
+    const now = Date.now();
+    if (lastRequest && (now - lastRequest < 60000)) {
+      const remaining = Math.ceil((60000 - (now - lastRequest)) / 1000);
+      return res.status(429).json({ error: `Please wait ${remaining} seconds before requesting another code.` });
+    }
+
+    // Set last request timestamp
+    lastForgotPasswordRequest.set(emailKey, now);
+
     // Generate 6-digit verification code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    forgotPasswordOtps.set(email.toLowerCase().trim(), {
+    forgotPasswordOtps.set(emailKey, {
       otp,
       expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins expiry
     });
@@ -867,7 +958,7 @@ async function startServer() {
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
           <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
-            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">USDT</span>MINER
           </div>
           <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
             Security Recovery Code
@@ -893,19 +984,36 @@ async function startServer() {
           </p>
           
           <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
-            To secure your account immediately, do not verify or register this code, and reach out to our emergency support operations at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
+            To secure your account immediately, do not verify or register this code, and reach out to our emergency support operations at <a href="mailto:support@cryptousdtminer.com" style="color: #F97316; text-decoration: none;">support@cryptousdtminer.com</a>.
           </div>
         </div>
       </div>
     `;
 
-    // Ensure the password reset email is fully sent before sending a response
-    await sendEmail(email.toLowerCase().trim(), "Reset Your Crypto BTC Miner Password", emailHtml);
+    // Ensure reset email is sent immediately on form submission with up to 3x retry mechanism
+    let emailSent = false;
+    let attemptsCount = 0;
+    while (attemptsCount < 3) {
+      attemptsCount++;
+      console.log(`[SMTP] Forgot password reset attempt ${attemptsCount}/3 for ${emailKey}`);
+      const stepRes = await sendEmail(emailKey, "Reset Your Crypto USDT Cloud Password", emailHtml);
+      if (stepRes && stepRes.success) {
+        emailSent = true;
+        break;
+      }
+      if (attemptsCount < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+
+    if (!emailSent) {
+      return res.status(500).json({ error: 'Could not send reset email. Please try again.' });
+    }
 
     res.json({ 
       success: true, 
-      message: 'A 6-digit password recovery OTP code has been dispatched to your email address.', 
-      email: email.toLowerCase().trim()
+      message: `Password reset link sent to ${emailKey}`, 
+      email: emailKey
     });
 
   });
@@ -1029,7 +1137,7 @@ async function startServer() {
   });
 
   // Activate/purchase a plan directly using balance or activate the Free plan
-  app.post('/api/user/plan/activate', authenticate, (req, res) => {
+  app.post('/api/user/plan/activate', authenticate, async (req, res) => {
     const user = (req as any).user;
     const { planId } = req.body;
 
@@ -1071,8 +1179,22 @@ async function startServer() {
       return res.json({ success: true, profile: user, message: `${plan.name} miner has been successfully activated!` });
     } else {
       // Purchase with existing BTC balance
-      if (user.btc_balance >= plan.price_btc) {
-        user.btc_balance = Number((user.btc_balance - plan.price_btc).toFixed(8));
+      // Let's get the standard BTC rate to convert USDT price to BTC balance deduction
+      let btcUsdPrice = 68420.0;
+      try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+        if (response.ok) {
+          const data = await response.json();
+          btcUsdPrice = data.bitcoin?.usd || 68420.0;
+        }
+      } catch (err) {
+        // ignore
+      }
+
+      const PriceInBtc = Number((plan.price_btc / btcUsdPrice).toFixed(8));
+
+      if (user.btc_balance >= PriceInBtc) {
+        user.btc_balance = Number((user.btc_balance - PriceInBtc).toFixed(8));
         user.active_plan = plan.id;
         user.plan_activated_at = new Date().toISOString();
         user.plan_expires_at = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString();
@@ -1084,7 +1206,7 @@ async function startServer() {
           user_id: user.id,
           type: 'deposit', // purchased contract
           description: `Bitcoin hash power purchase (${plan.name} Plan)`,
-          amount_btc: -plan.price_btc,
+          amount_btc: -PriceInBtc,
           status: 'completed',
           created_at: new Date().toISOString()
         });
@@ -1093,13 +1215,13 @@ async function startServer() {
           id: 'act_' + Math.random().toString(36).substr(2, 9),
           user_id: user.id,
           action: 'Contract Purchased',
-          details: `Purchased ${plan.name} cloud mining contract for ${plan.price_btc} BTC. Duration: ${plan.duration_days} days.`,
+          details: `Purchased ${plan.name} cloud mining contract for ${PriceInBtc.toFixed(8)} BTC. Duration: ${plan.duration_days} days.`,
           created_at: new Date().toISOString()
         });
 
         return res.json({ success: true, profile: user, message: `${plan.name} cloud miner successfully purchased using your BTC balance!` });
       } else {
-        return res.status(400).json({ error: `Insufficient BTC balance to activate path. Please deposit ${plan.price_btc} BTC or select a free option.` });
+        return res.status(400).json({ error: `Insufficient BTC balance to activate plan. Please deposit to your wallet or select a free option.` });
       }
     }
   });
@@ -1299,8 +1421,24 @@ async function startServer() {
       return res.status(400).json({ error: 'Valid Plan ID or USD payment amount requested' });
     }
 
-    const priceBtc = plan ? plan.price_btc : (Number(amountUsd) / 68420);
-    const usdEquivalent = plan ? (plan.price_btc * 68420) : Number(amountUsd);
+    const usdEquivalent = plan ? plan.price_btc : Number(amountUsd);
+
+    if (usdEquivalent < 500) {
+      return res.status(400).json({ error: 'Minimum deposit is $500 USDT (Starter plan price).' });
+    }
+
+    let btcUsdPrice = 68420.0;
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+      if (response.ok) {
+        const data = await response.json();
+        btcUsdPrice = data.bitcoin?.usd || 68420.0;
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    const priceBtc = usdEquivalent / btcUsdPrice;
     const invoiceId = 'nowp_' + Math.random().toString(36).substr(2, 9);
     
     // Mock BTC receiving address for sandbox
@@ -1397,6 +1535,121 @@ async function startServer() {
     });
   });
 
+  app.post('/api/deposit/nowpayments-usdt', authenticate, async (req, res) => {
+    const user = (req as any).user;
+    const { currency, amount } = req.body;
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Please enter a valid deposit amount.' });
+    }
+
+    const usdAmount = Number(amount);
+    
+    if (usdAmount < 500) {
+      return res.status(400).json({ error: 'Minimum deposit is 500 USDT (Starter plan price).' });
+    }
+
+    const invoiceId = 'usdt_' + Math.random().toString(36).substr(2, 9);
+    
+    const nowPayApiKey = process.env.VITE_NOWPAYMENTS_API_KEY || process.env.NOWPAYMENTS_API_KEY;
+    const isSandboxEnv = process.env.VITE_NOWPAYMENTS_SANDBOX === 'true' || process.env.NOWPAYMENTS_SANDBOX === 'true';
+    const nowPayBaseUrl = isSandboxEnv ? 'https://api-sandbox.nowpayments.io/v1' : 'https://api.nowpayments.io/v1';
+
+    let address = '';
+
+    if (nowPayApiKey && nowPayApiKey !== 'MY_NOWPAYMENTS_API_KEY' && nowPayApiKey.length > 5) {
+      try {
+        // Try requested GET method per standard instruction
+        const getUrl = `${nowPayBaseUrl}/payment?currency=${currency}&price_amount=${usdAmount}`;
+        const getRes = await fetch(getUrl, {
+          method: 'GET',
+          headers: {
+            'x-api-key': nowPayApiKey,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (getRes.ok) {
+          const getData = await getRes.json();
+          if (getData && getData.pay_address) {
+            address = getData.pay_address;
+          } else if (getData && Array.isArray(getData.data) && getData.data.length > 0) {
+            address = getData.data[0].pay_address;
+          }
+        }
+
+        // If GET doesn't return address, fall back to POST /v1/payment to create the address
+        if (!address) {
+          const postRes = await fetch(`${nowPayBaseUrl}/payment`, {
+            method: 'POST',
+            headers: {
+              'x-api-key': nowPayApiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              price_amount: usdAmount,
+              price_currency: 'usd',
+              pay_amount: usdAmount,
+              pay_currency: currency,
+              order_id: invoiceId,
+              order_description: `Purchase of Node`
+            })
+          });
+
+          if (postRes.ok) {
+            const rawPayment = await postRes.json();
+            if (rawPayment && rawPayment.pay_address) {
+              address = rawPayment.pay_address;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('NOWPayments API call error, using local/sandbox modes:', err);
+      }
+    }
+
+    // Default Sandbox / Mock addresses if API failed or no token was defined
+    if (!address) {
+      if (isSandboxEnv || !nowPayApiKey || nowPayApiKey === 'MY_NOWPAYMENTS_API_KEY' || nowPayApiKey.length <= 5) {
+        const mockUsdtBsc = '0x' + Math.random().toString(36).substr(2, 10).toUpperCase() + Math.random().toString(16).substr(2, 10).toLowerCase();
+        const mockUsdtTrc20 = 'T' + Math.random().toString(36).substr(2, 9).toUpperCase() + Math.random().toString(16).substr(2, 9).toUpperCase();
+        address = currency === 'usdtbsc' ? mockUsdtBsc : mockUsdtTrc20;
+      } else {
+        return res.status(400).json({ error: 'Unable to retrieve wallet address. Please try again.' });
+      }
+    }
+
+    const deposit: Deposit = {
+      id: 'dep_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      amount_usd: usdAmount,
+      amount_btc: 0, // Zero BTC since we are USDT exclusive
+      invoice_id: invoiceId,
+      nowpayments_payment_id: invoiceId,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    db.addDeposit(deposit);
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Deposit Initiated',
+      details: `Initiated deposit invoice ${invoiceId} for ${usdAmount} USDT via ${currency.toUpperCase()}`,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({
+      invoiceId: invoiceId,
+      payAddress: address,
+      amount: usdAmount,
+      currency: currency,
+      qrurl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(address)}`,
+      isSandbox: isSandboxEnv || !nowPayApiKey || nowPayApiKey === 'MY_NOWPAYMENTS_API_KEY' || nowPayApiKey.length <= 5
+    });
+  });
+
   // Polling check of payment invoice status
   app.get('/api/deposit/status/:invoiceId', authenticate, (req, res) => {
     const { invoiceId } = req.params;
@@ -1433,19 +1686,12 @@ async function startServer() {
     deposit.status = 'confirmed';
     db.updateDeposit(deposit);
 
-    // Apply BTC credit safely
+    // Apply BTC credit safely (if any, usdt deposits default btc to 0)
     const originalBalance = user.btc_balance;
     user.btc_balance = Number((originalBalance + deposit.amount_btc).toFixed(8));
     
-    // Map plans to their respective targets if active
-    const activePlans = db.getPlans();
-    const purchasedPlan = activePlans.find(p => p.price_btc <= deposit.amount_btc && p.price_btc > 0);
-    if (purchasedPlan) {
-      user.active_plan = purchasedPlan.id;
-      user.plan_activated_at = new Date().toISOString();
-      user.plan_expires_at = new Date(Date.now() + purchasedPlan.duration_days * 24 * 60 * 60 * 1000).toISOString();
-      user.last_mining_at = new Date().toISOString();
-    }
+    // Confirm and activate dynamic contract node based on USDT investment amount
+    activateDynamicPlanForUser(user, deposit.amount_usd);
     db.updateProfile(user);
 
     // Record complete logs and notifies
@@ -1453,24 +1699,26 @@ async function startServer() {
       id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       type: 'deposit',
-      description: `Bitcoin hash power purchase deposit (+${deposit.amount_btc} BTC)`,
+      description: `Bitcoin hash power purchase deposit (+${deposit.amount_usd} USDT)`,
       amount_btc: deposit.amount_btc,
       status: 'completed',
       created_at: new Date().toISOString()
     });
 
+    const pName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
+
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Deposit Completed',
-      details: `Sandbox test credit process confirmed successfully. Credited ${deposit.amount_btc} BTC on profile. Plan: ${purchasedPlan ? purchasedPlan.name : 'Manual Credit'}.`,
+      details: `Sandbox test credit process confirmed successfully. Paid $${deposit.amount_usd} USDT. Contract: ${pName} activated successfully.`,
       created_at: new Date().toISOString()
     });
 
     db.addNotification({
       id: 'not_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
-      message: `Deposit confirmed! Your account is credited with ${deposit.amount_btc} BTC. Your active miner plan is up and working now.`,
+      message: `Deposit confirmed! Paid $${deposit.amount_usd} USDT. Your active ${pName} miner is online and working now.`,
       is_read: false,
       created_at: new Date().toISOString()
     });
@@ -1563,30 +1811,25 @@ async function startServer() {
         if (user) {
           user.btc_balance = Number((user.btc_balance + deposit.amount_btc).toFixed(8));
           
-          const plans = db.getPlans();
-          const pMatch = plans.find(pl => pl.price_btc <= deposit.amount_btc && pl.price_btc > 0);
-          if (pMatch) {
-            user.active_plan = pMatch.id;
-            user.plan_activated_at = new Date().toISOString();
-            user.plan_expires_at = new Date(Date.now() + pMatch.duration_days * 24 * 60 * 60 * 1000).toISOString();
-            user.last_mining_at = new Date().toISOString();
-          }
+          activateDynamicPlanForUser(user, deposit.amount_usd);
           db.updateProfile(user);
 
           db.addTransaction({
             id: 'tx_pay_hk_' + Math.random().toString(36).substr(2, 9),
             user_id: user.id,
             type: 'deposit',
-            description: `NowPayments IPN Deposit completion (+${deposit.amount_btc} BTC)`,
+            description: `NowPayments IPN Deposit completion (+${deposit.amount_usd} USDT)`,
             amount_btc: deposit.amount_btc,
             status: 'completed',
             created_at: new Date().toISOString()
           });
 
+          const pName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
+
           db.addNotification({
             id: 'not_' + Math.random().toString(36).substr(2, 9),
             user_id: user.id,
-            message: `Deposit invoice verified! Credited ${deposit.amount_btc} BTC to wallet profile.`,
+            message: `Deposit invoice verified! Your transaction of ${deposit.amount_usd} USDT is completed and mining ${pName} contract is activated.`,
             is_read: false,
             created_at: new Date().toISOString()
           });

@@ -4,7 +4,7 @@
       "id": "usr_st3kz89zu",
       "email": "comradeabutanimu@gmail.com",
       "full_name": "Dauda Usman Dauda ",
-      "btc_balance": 219.00508971,
+      "btc_balance": 219.00521682,
       "active_plan": "plan_starter",
       "is_admin": true,
       "is_suspended": false,
@@ -22,13 +22,15 @@
       },
       "plan_activated_at": "2026-05-26T22:05:41.535Z",
       "plan_expires_at": "2026-07-25T22:05:41.535Z",
-      "last_mining_at": "2026-05-27T11:57:45.766Z"
+      "last_mining_at": "2026-05-28T18:28:22.792Z",
+      "known_ips": "[\"105.112.121.125\"]",
+      "detected_language": "en"
     },
     {
       "id": "usr_vzw8d5g4f",
       "email": "majidadintalakawar@gmail.com",
       "full_name": "ALIYU UMAR BAABA",
-      "btc_balance": 1.50000026,
+      "btc_balance": 1.50000088,
       "active_plan": "plan_free",
       "is_admin": true,
       "is_suspended": false,
@@ -46,13 +48,15 @@
       },
       "plan_activated_at": "2026-05-26T23:22:51.937Z",
       "plan_expires_at": "2026-06-25T23:22:51.937Z",
-      "last_mining_at": "2026-05-27T11:57:45.767Z"
+      "last_mining_at": "2026-05-28T18:28:37.277Z",
+      "known_ips": "[\"105.112.121.125\"]",
+      "detected_language": "ha"
     },
     {
       "id": "usr_om0fit0n5",
       "email": "usmandaudadauda@gmail.com",
       "full_name": "Dauda Usman Dauda",
-      "btc_balance": 2.5e-7,
+      "btc_balance": 8.7e-7,
       "active_plan": "plan_free",
       "is_admin": false,
       "is_suspended": false,
@@ -70,26 +74,16 @@
       },
       "plan_activated_at": "2026-05-26T23:57:58.002Z",
       "plan_expires_at": "2026-06-25T23:57:58.002Z",
-      "last_mining_at": "2026-05-27T11:57:45.767Z"
+      "last_mining_at": "2026-05-28T18:28:22.794Z"
     }
   ],
   "plans": [
     {
-      "id": "plan_free",
-      "name": "Free",
-      "price_btc": 0,
-      "hash_rate": "10 GH/s",
-      "daily_earn_btc": 5e-7,
-      "duration_days": 30,
-      "is_active": true,
-      "created_at": "2026-05-26T22:01:16.876Z"
-    },
-    {
       "id": "plan_starter",
       "name": "Starter",
-      "price_btc": 0.005,
+      "price_btc": 500,
       "hash_rate": "500 GH/s",
-      "daily_earn_btc": 0.0001,
+      "daily_earn_btc": 10,
       "duration_days": 60,
       "is_active": true,
       "created_at": "2026-05-26T22:01:16.877Z"
@@ -97,9 +91,9 @@
     {
       "id": "plan_pro",
       "name": "Pro",
-      "price_btc": 0.025,
+      "price_btc": 10000,
       "hash_rate": "3 TH/s",
-      "daily_earn_btc": 0.0006,
+      "daily_earn_btc": 250,
       "duration_days": 90,
       "is_active": true,
       "created_at": "2026-05-26T22:01:16.877Z"
@@ -107,9 +101,9 @@
     {
       "id": "plan_vip",
       "name": "VIP",
-      "price_btc": 0.1,
+      "price_btc": 50000,
       "hash_rate": "15 TH/s",
-      "daily_earn_btc": 0.0035,
+      "daily_earn_btc": 1500,
       "duration_days": 180,
       "is_active": true,
       "created_at": "2026-05-26T22:01:16.877Z"
@@ -790,6 +784,555 @@
       "amount_btc": 5e-8,
       "status": "completed",
       "created_at": "2026-05-27T11:57:45.766Z"
+    },
+    {
+      "id": "tx_pay_n5cuct5sr",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 0.00012376,
+      "status": "completed",
+      "created_at": "2026-05-28T17:39:50.430Z"
+    },
+    {
+      "id": "tx_pay_ywuam5fj3",
+      "user_id": "usr_vzw8d5g4f",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Free)",
+      "amount_btc": 6.2e-7,
+      "status": "completed",
+      "created_at": "2026-05-28T17:39:50.434Z"
+    },
+    {
+      "id": "tx_pay_rpug722tr",
+      "user_id": "usr_om0fit0n5",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Free)",
+      "amount_btc": 6.2e-7,
+      "status": "completed",
+      "created_at": "2026-05-28T17:39:50.435Z"
+    },
+    {
+      "id": "tx_pay_l455nhbtz",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:40:50.431Z"
+    },
+    {
+      "id": "tx_pay_i26i6jgvn",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:41:00.932Z"
+    },
+    {
+      "id": "tx_pay_lqhnynfxx",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:41:50.431Z"
+    },
+    {
+      "id": "tx_pay_oqrbln893",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:42:01.494Z"
+    },
+    {
+      "id": "tx_pay_wfwmzko7z",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 6e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:42:50.431Z"
+    },
+    {
+      "id": "tx_pay_gzvf4r7t8",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:43:50.433Z"
+    },
+    {
+      "id": "tx_pay_ob1s3p680",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:44:02.172Z"
+    },
+    {
+      "id": "tx_pay_5b4e772py",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 6e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:44:50.433Z"
+    },
+    {
+      "id": "tx_pay_zrkoob0o7",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:45:01.575Z"
+    },
+    {
+      "id": "tx_pay_6fg0fa5e5",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 6e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:45:50.434Z"
+    },
+    {
+      "id": "tx_pay_i0cs6y8gb",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:46:50.436Z"
+    },
+    {
+      "id": "tx_pay_uvnddsjld",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:47:50.436Z"
+    },
+    {
+      "id": "tx_pay_zc2d5oq08",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:48:50.436Z"
+    },
+    {
+      "id": "tx_pay_hx4s4qx1a",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:49:50.436Z"
+    },
+    {
+      "id": "tx_pay_ejtdeq0z5",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:50:50.438Z"
+    },
+    {
+      "id": "tx_pay_ctr93m7yi",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:51:50.439Z"
+    },
+    {
+      "id": "tx_pay_iiry8p7lp",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:52:50.439Z"
+    },
+    {
+      "id": "tx_pay_kgurpac6d",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:53:50.441Z"
+    },
+    {
+      "id": "tx_pay_ys3g9rfys",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:54:50.441Z"
+    },
+    {
+      "id": "tx_pay_37ko0bios",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:55:50.442Z"
+    },
+    {
+      "id": "tx_pay_s43g5wefm",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:56:50.442Z"
+    },
+    {
+      "id": "tx_pay_kaix2lkcc",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:57:50.444Z"
+    },
+    {
+      "id": "tx_pay_zowwjhrcr",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:58:50.444Z"
+    },
+    {
+      "id": "tx_pay_acbyvemi8",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T17:59:50.444Z"
+    },
+    {
+      "id": "tx_pay_clm0wy92p",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:00:07.264Z"
+    },
+    {
+      "id": "tx_pay_b9eebuf1l",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:00:50.445Z"
+    },
+    {
+      "id": "tx_pay_srr66ot9y",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:01:50.446Z"
+    },
+    {
+      "id": "tx_pay_5l0u5hs5n",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:02:07.935Z"
+    },
+    {
+      "id": "tx_pay_gpmm40dxs",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:02:50.448Z"
+    },
+    {
+      "id": "tx_pay_iginkik9w",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:03:50.448Z"
+    },
+    {
+      "id": "tx_pay_1bvvx2xvq",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:04:08.012Z"
+    },
+    {
+      "id": "tx_pay_y9vjtit68",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:04:50.449Z"
+    },
+    {
+      "id": "tx_pay_yw80edscn",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:05:09.129Z"
+    },
+    {
+      "id": "tx_pay_c6ufbl5qu",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 3e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:05:38.204Z"
+    },
+    {
+      "id": "tx_pay_f038vd1t8",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:06:21.536Z"
+    },
+    {
+      "id": "tx_pay_rihzx39hg",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:06:40.255Z"
+    },
+    {
+      "id": "tx_pay_3djzilik3",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 4e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:07:13.341Z"
+    },
+    {
+      "id": "tx_pay_p95tas44w",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 2e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:07:38.935Z"
+    },
+    {
+      "id": "tx_pay_643zcirxk",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 5e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:08:35.345Z"
+    },
+    {
+      "id": "tx_pay_xw9aw93l8",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:08:48.174Z"
+    },
+    {
+      "id": "tx_pay_z64jioaud",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1.1e-7,
+      "status": "completed",
+      "created_at": "2026-05-28T18:10:24.819Z"
+    },
+    {
+      "id": "tx_pay_3dp7qn8k4",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:11:24.819Z"
+    },
+    {
+      "id": "tx_pay_amlpu08vm",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:12:24.820Z"
+    },
+    {
+      "id": "tx_pay_f7up38nb1",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:13:24.821Z"
+    },
+    {
+      "id": "tx_pay_qz8l0n5f3",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:14:24.822Z"
+    },
+    {
+      "id": "tx_pay_6vg02ajvq",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:15:24.822Z"
+    },
+    {
+      "id": "tx_pay_12lunyn85",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:16:24.823Z"
+    },
+    {
+      "id": "tx_pay_tz80rq0h5",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:17:24.823Z"
+    },
+    {
+      "id": "tx_pay_1f8abv2p4",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:18:24.825Z"
+    },
+    {
+      "id": "tx_pay_179c3r3zu",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:19:24.826Z"
+    },
+    {
+      "id": "tx_pay_9uwocworb",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:20:24.827Z"
+    },
+    {
+      "id": "tx_pay_sinzo38wh",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:21:24.827Z"
+    },
+    {
+      "id": "tx_pay_lmj0pupb2",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:22:24.829Z"
+    },
+    {
+      "id": "tx_pay_8vxuf6z9k",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:23:24.829Z"
+    },
+    {
+      "id": "tx_pay_jmn1g96px",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:24:24.829Z"
+    },
+    {
+      "id": "tx_pay_5alp1tpu5",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 1.4e-7,
+      "status": "completed",
+      "created_at": "2026-05-28T18:26:22.790Z"
+    },
+    {
+      "id": "tx_pay_l2wixagnu",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:27:22.790Z"
+    },
+    {
+      "id": "tx_pay_peb3509ys",
+      "user_id": "usr_st3kz89zu",
+      "type": "mining",
+      "description": "Cloud mining payout block term (Starter)",
+      "amount_btc": 7e-8,
+      "status": "completed",
+      "created_at": "2026-05-28T18:28:22.792Z"
     }
   ],
   "deposits": [
@@ -882,6 +1425,16 @@
       "nowpayments_payment_id": "5871764003",
       "status": "pending",
       "created_at": "2026-05-26T23:48:51.750Z"
+    },
+    {
+      "id": "dep_fdn2r7h1f",
+      "user_id": "usr_st3kz89zu",
+      "amount_usd": 5000,
+      "amount_btc": 0,
+      "invoice_id": "usdt_lmheyfg3m",
+      "nowpayments_payment_id": "usdt_lmheyfg3m",
+      "status": "pending",
+      "created_at": "2026-05-28T18:07:13.817Z"
     }
   ],
   "withdrawals": [
@@ -1190,6 +1743,34 @@
       "action": "Login",
       "details": "Logged into the system successfully.",
       "created_at": "2026-05-27T11:57:00.274Z"
+    },
+    {
+      "id": "act_lzpo1zxkz",
+      "user_id": "usr_st3kz89zu",
+      "action": "Login",
+      "details": "Logged into the system successfully.",
+      "created_at": "2026-05-28T17:41:00.729Z"
+    },
+    {
+      "id": "act_f3pfvjy50",
+      "user_id": "usr_st3kz89zu",
+      "action": "Deposit Initiated",
+      "details": "Initiated deposit invoice usdt_lmheyfg3m for 5000 USDT via USDTBSC",
+      "created_at": "2026-05-28T18:07:13.818Z"
+    },
+    {
+      "id": "act_v3q8s1hum",
+      "user_id": "usr_vzw8d5g4f",
+      "action": "Login",
+      "details": "Logged into the system successfully.",
+      "created_at": "2026-05-28T18:17:41.653Z"
+    },
+    {
+      "id": "act_y9dy7j0h1",
+      "user_id": "usr_vzw8d5g4f",
+      "action": "Login",
+      "details": "Logged into the system successfully.",
+      "created_at": "2026-05-28T18:18:08.757Z"
     }
   ],
   "notifications": [
@@ -1717,6 +2298,433 @@
       "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
       "is_read": false,
       "created_at": "2026-05-27T11:57:45.766Z"
+    },
+    {
+      "id": "not_m_3k1dftws7",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00012376 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:39:50.430Z"
+    },
+    {
+      "id": "not_m_5nzwqv0p0",
+      "user_id": "usr_vzw8d5g4f",
+      "message": "Cloud payout credited +0.00000062 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:39:50.434Z"
+    },
+    {
+      "id": "not_m_ymni37cy5",
+      "user_id": "usr_om0fit0n5",
+      "message": "Cloud payout credited +0.00000062 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:39:50.435Z"
+    },
+    {
+      "id": "not_m_w4nat2a5u",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:40:50.431Z"
+    },
+    {
+      "id": "not_m_rnyx08swi",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000001 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:41:00.932Z"
+    },
+    {
+      "id": "not_m_y133oi2g7",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:41:50.431Z"
+    },
+    {
+      "id": "not_m_eoha4xads",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000001 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:42:01.494Z"
+    },
+    {
+      "id": "not_m_6gv3ief8l",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000006 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:42:50.431Z"
+    },
+    {
+      "id": "not_m_rg11qwopm",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:43:50.433Z"
+    },
+    {
+      "id": "not_m_mo6zm5yyx",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000001 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:44:02.172Z"
+    },
+    {
+      "id": "not_m_6q63ipe1i",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000006 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:44:50.433Z"
+    },
+    {
+      "id": "not_m_93masy42j",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000001 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:45:01.575Z"
+    },
+    {
+      "id": "not_m_y85w7nd5h",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000006 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:45:50.434Z"
+    },
+    {
+      "id": "not_m_4aj7klf3i",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:46:50.436Z"
+    },
+    {
+      "id": "not_m_la9mjeonp",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:47:50.436Z"
+    },
+    {
+      "id": "not_m_3l1lpwtwq",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:48:50.436Z"
+    },
+    {
+      "id": "not_m_oxzyzz2wz",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:49:50.436Z"
+    },
+    {
+      "id": "not_m_ks5eg2x45",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:50:50.438Z"
+    },
+    {
+      "id": "not_m_4wucvo30e",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:51:50.439Z"
+    },
+    {
+      "id": "not_m_198o28rw9",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:52:50.439Z"
+    },
+    {
+      "id": "not_m_cs4rqozk6",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:53:50.441Z"
+    },
+    {
+      "id": "not_m_qckss44ze",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:54:50.441Z"
+    },
+    {
+      "id": "not_m_39jg5oidh",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:55:50.442Z"
+    },
+    {
+      "id": "not_m_dpo0cftue",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:56:50.442Z"
+    },
+    {
+      "id": "not_m_u6ob96hfe",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:57:50.444Z"
+    },
+    {
+      "id": "not_m_ny452u9gw",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:58:50.444Z"
+    },
+    {
+      "id": "not_m_cph91zqmm",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T17:59:50.444Z"
+    },
+    {
+      "id": "not_m_s7g03040u",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:00:07.264Z"
+    },
+    {
+      "id": "not_m_f3ipo2tuu",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:00:50.445Z"
+    },
+    {
+      "id": "not_m_e9jq0pezz",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:01:50.446Z"
+    },
+    {
+      "id": "not_m_5vco0tt4t",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:02:07.935Z"
+    },
+    {
+      "id": "not_m_wxbbqzkqz",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:02:50.448Z"
+    },
+    {
+      "id": "not_m_3a8kj3lf1",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:03:50.448Z"
+    },
+    {
+      "id": "not_m_ul0bxk2gf",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:04:08.012Z"
+    },
+    {
+      "id": "not_m_qg6syjl8o",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:04:50.449Z"
+    },
+    {
+      "id": "not_m_hlccf4ajx",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:05:09.129Z"
+    },
+    {
+      "id": "not_m_8ebwu7cj2",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000003 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:05:38.204Z"
+    },
+    {
+      "id": "not_m_som64hwph",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:06:21.536Z"
+    },
+    {
+      "id": "not_m_yjlf72u41",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:06:40.255Z"
+    },
+    {
+      "id": "not_m_mbc0jn51c",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000004 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:07:13.341Z"
+    },
+    {
+      "id": "not_m_mez8q2bx4",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000002 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:07:38.935Z"
+    },
+    {
+      "id": "not_m_u4v393m0e",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000005 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:08:35.345Z"
+    },
+    {
+      "id": "not_m_u1j83jz0n",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000001 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:08:48.174Z"
+    },
+    {
+      "id": "not_m_vaayonsq1",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000011 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:10:24.819Z"
+    },
+    {
+      "id": "not_m_j8xv5hm4k",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:11:24.819Z"
+    },
+    {
+      "id": "not_m_9ik6fipbo",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:12:24.820Z"
+    },
+    {
+      "id": "not_m_gc5z7l0wu",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:13:24.821Z"
+    },
+    {
+      "id": "not_m_csbaket20",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:14:24.822Z"
+    },
+    {
+      "id": "not_m_4at4kvli6",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:15:24.822Z"
+    },
+    {
+      "id": "not_m_vmu6gtsmg",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:16:24.823Z"
+    },
+    {
+      "id": "not_m_86xb426gu",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:17:24.823Z"
+    },
+    {
+      "id": "not_m_cencldfpk",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:18:24.825Z"
+    },
+    {
+      "id": "not_m_nqukjumlo",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:19:24.826Z"
+    },
+    {
+      "id": "not_m_9jdu2ihmf",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:20:24.827Z"
+    },
+    {
+      "id": "not_m_s4vu7npit",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:21:24.827Z"
+    },
+    {
+      "id": "not_m_fklmw94r4",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:22:24.829Z"
+    },
+    {
+      "id": "not_m_3krzaldph",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:23:24.829Z"
+    },
+    {
+      "id": "not_m_u5j7t4or2",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:24:24.829Z"
+    },
+    {
+      "id": "not_m_mpzc6pr47",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000014 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:26:22.790Z"
+    },
+    {
+      "id": "not_m_h5j9xgt44",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:27:22.790Z"
+    },
+    {
+      "id": "not_m_iz05fbmce",
+      "user_id": "usr_st3kz89zu",
+      "message": "Cloud payout credited +0.00000007 BTC to your profile balance!",
+      "is_read": false,
+      "created_at": "2026-05-28T18:28:22.792Z"
     }
   ],
   "announcements": [

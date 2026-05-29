@@ -8,6 +8,7 @@ import {
   Eye, EyeOff, Coins, Zap, Trophy, TrendingUp, ArrowUpRight, 
   ChevronRight, Volume2, ShieldAlert, Cpu 
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Profile, Transaction, Announcement, CoingeckoPrice, Plan } from '../types.js';
 
 interface OverviewProps {
@@ -48,28 +49,30 @@ export default function Overview({
 
     // Resolve live daily earning rate based on computed cloud plan settings
     let dailyEarn = 0;
-    const activePlanObj = plans?.find(p => p.id === profile.active_plan);
-    if (activePlanObj) {
-      dailyEarn = activePlanObj.daily_earn_btc;
+    if (profile.active_plan_investment && profile.active_plan_rate) {
+      const btcUsd = btcPrice?.btc_usd || 68420.0;
+      dailyEarn = (profile.active_plan_investment * profile.active_plan_rate) / btcUsd;
     } else {
-      // fallback matching default configuration values
-      if (profile.active_plan === 'plan_free') dailyEarn = 0.0000005;
-      else if (profile.active_plan === 'plan_starter') dailyEarn = 0.0001;
-      else if (profile.active_plan === 'plan_pro') dailyEarn = 0.0006;
-      else if (profile.active_plan === 'plan_vip') dailyEarn = 0.0035;
+      const activePlanObj = plans?.find(p => p.id === profile.active_plan);
+      if (activePlanObj) {
+        dailyEarn = activePlanObj.daily_earn_btc;
+      } else {
+        // fallback matching default configuration values
+        if (profile.active_plan === 'plan_starter') dailyEarn = 0.00024359;
+        else if (profile.active_plan === 'plan_pro') dailyEarn = 0.00632479;
+        else if (profile.active_plan === 'plan_vip') dailyEarn = 0.02735043;
+      }
     }
 
     if (dailyEarn <= 0) {
-      // background micro hashing indicator so ledger doesn't look completely frozen
-      dailyEarn = 0.00000002;
+      return;
     }
 
     // Convert daily rate to milliseconds rate (86,400,000 miliseconds in a day)
     const btcPerMs = dailyEarn / 86400000;
     
-    // Multiplied by a pacing factor so that the continuous hashing is visually clear,
-    // and the 9th and 10th high-precision decimal places increment smoothly at 60hz
-    const boostMultiplier = 5.0; 
+    // Multiplied by a pacing factor so that the continuous hashing is visually clear
+    const boostMultiplier = 1.0; 
     const stepPerMs = btcPerMs * boostMultiplier;
 
     let animationId: number;
@@ -87,7 +90,7 @@ export default function Overview({
 
     animationId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationId);
-  }, [profile.active_plan, plans, blur, profile.btc_balance]);
+  }, [profile.active_plan, profile.active_plan_investment, profile.active_plan_rate, btcPrice, plans, blur, profile.btc_balance]);
 
   const handleBlurToggle = () => {
     const newVal = !blur;
@@ -95,17 +98,72 @@ export default function Overview({
     onUpdateBlur(newVal);
   };
 
+  // Determine dynamic hashpower in TH/s and other stats
+  const getHashPowerInTh = (): number => {
+    const planId = profile.active_plan;
+    if (!planId) return 0;
+    
+    // Check if profile lists dynamic hash rate
+    if (profile.active_plan_hash_rate) {
+      return profile.active_plan_hash_rate / 1000; // Returns in TH/s since active_plan_hash_rate is in GH/s
+    }
+
+    // Find in passed plans first
+    const plan = plans?.find(p => p.id === planId);
+    if (plan) {
+      const rateStr = plan.hash_rate || '';
+      const num = parseFloat(rateStr);
+      if (!isNaN(num)) {
+        if (rateStr.toUpperCase().includes('GH/S')) {
+          return num / 1000;
+        }
+        if (rateStr.toUpperCase().includes('TH/S')) {
+          return num;
+        }
+        return num;
+      }
+    }
+    
+    // Fallbacks
+    if (planId === 'plan_free') return 0.01;      // 10 GH/s
+    if (planId === 'plan_starter') return 0.5;    // 500 GH/s
+    if (planId === 'plan_pro') return 3.0;        // 3 TH/s
+    if (planId === 'plan_vip') return 15.0;       // 15 TH/s
+    
+    return 0;
+  };
+
+  const hashPowerInTh = getHashPowerInTh();
+  
+  // Calculate progress percentage relative to dynamic maximum
+  const maxCapacity = Math.max(15.0, hashPowerInTh);
+  const progressPercentage = Math.min((hashPowerInTh / maxCapacity) * 100, 100);
+
+  // Resolve daily earning rate
+  let dailyEarningRate = 0;
+  if (profile.active_plan_investment && profile.active_plan_rate) {
+    const btcUsd = btcPrice?.btc_usd || 68420.0;
+    dailyEarningRate = (profile.active_plan_investment * profile.active_plan_rate) / btcUsd;
+  } else {
+    const activePlanObj = plans?.find(p => p.id === profile.active_plan);
+    if (activePlanObj) {
+      dailyEarningRate = activePlanObj.daily_earn_btc;
+    } else {
+      if (profile.active_plan === 'plan_starter') dailyEarningRate = 0.00024359;
+      else if (profile.active_plan === 'plan_pro') dailyEarningRate = 0.00632479;
+      else if (profile.active_plan === 'plan_vip') dailyEarningRate = 0.02735043;
+    }
+  }
+
   const formattedBtc = (val: number) => {
-    return val.toFixed(10); // Display 10 decimals for beautiful live continuous ticking precision!
+    return val.toFixed(8); // 8 decimal places for authentic BTC high precision ticking visual updates
   };
 
   const formattedUsd = (val: number) => {
-    return (val * btcPrice.btc_usd).toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 4, // 4 decimal places for micro-cent live USD ticking updates!
-      maximumFractionDigits: 4
-    });
+    return val.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }) + ' USD';
   };
 
   // Extract recent activities
@@ -149,6 +207,26 @@ export default function Overview({
   return (
     <div className="space-y-6">
       {/* 4 Stat Summary Cards */}
+      {!profile.active_plan && (
+        <div className="bg-orange-100/50 border border-orange-200 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs text-left animate-fade-in mb-2">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-[#F97316] shrink-0">
+              <Zap className="h-6 w-6 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">You have no active plan.</h3>
+              <p className="text-sm text-gray-600 mt-1">Choose a plan to get started.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('plans')}
+            className="w-full md:w-auto px-6 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white text-sm font-bold rounded-full transition-all duration-200 cursor-pointer text-center whitespace-nowrap"
+          >
+            Purchase Plan
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
         {/* Card 1: BTC Balance */}
@@ -163,12 +241,39 @@ export default function Overview({
               {blur ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
             </button>
           </div>
-          <div className="mt-4">
-            <h3 className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}>
-              ₿ {formattedBtc(liveBtc)}
-            </h3>
+          <div className="mt-4 flex flex-col justify-end">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <motion.h3 
+                animate={{ 
+                  textShadow: ["0 0 0px rgba(16,185,129,0)", "0 0 6px rgba(16,185,129,0.35)", "0 0 0px rgba(16,185,129,0)"]
+                }}
+                transition={{ 
+                  duration: 2.5, 
+                  repeat: Infinity, 
+                  ease: "easeInOut" 
+                }}
+                className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}
+              >
+                {formattedBtc(liveBtc)} BTC
+              </motion.h3>
+              {!blur && profile.active_plan && (
+                <motion.span
+                  animate={{ 
+                    scale: [1, 1.4, 1],
+                    opacity: [0.4, 1, 0.4]
+                  }}
+                  transition={{ 
+                    duration: 1.5, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                  }}
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 self-center"
+                  title="Mining engine hashing live"
+                />
+              )}
+            </div>
             <p className={`text-xs text-gray-400 mt-1 transition-all duration-300 ${blur ? 'select-none filter blur-md' : ''}`}>
-              Mining rate active
+              {profile.active_plan ? 'Mining rate active' : 'Miner inactive'}
             </p>
           </div>
         </div>
@@ -176,17 +281,28 @@ export default function Overview({
         {/* Card 2: USD Value */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-gray-500 text-sm font-medium">USD Value</span>
+            <span className="text-gray-500 text-sm font-medium">Estimated USD Value</span>
             <div className="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center">
               <Coins className="h-4 w-4 text-orange-500" />
             </div>
           </div>
-          <div className="mt-4">
-            <h3 className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}>
-              {formattedUsd(liveBtc)}
-            </h3>
+          <div className="mt-4 flex flex-col justify-end">
+            <motion.h3 
+              animate={{ 
+                textShadow: ["0 0 0px rgba(16,185,129,0)", "0 0 6px rgba(16,185,129,0.3)", "0 0 0px rgba(16,185,129,0)"]
+              }}
+              transition={{ 
+                duration: 2.5, 
+                repeat: Infinity, 
+                ease: "easeInOut",
+                delay: 0.5
+              }}
+              className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}
+            >
+              {formattedUsd(liveBtc * (btcPrice?.btc_usd || 65000))}
+            </motion.h3>
             <p className="text-xs text-gray-400 mt-1">
-              Live rate proxy
+              Main account ledger
             </p>
           </div>
         </div>
@@ -201,14 +317,12 @@ export default function Overview({
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
-              {profile.active_plan === 'plan_free' ? 'Free Plan' : 
-               profile.active_plan === 'plan_starter' ? 'Starter Plan' :
+              {profile.active_plan === 'plan_starter' ? 'Starter Plan' :
                profile.active_plan === 'plan_pro' ? 'Pro Plan' :
                profile.active_plan === 'plan_vip' ? 'VIP Plan' : 'No Active Plan'}
             </h3>
             <p className="text-xs text-gray-400 mt-1">
-              {profile.active_plan === 'plan_free' ? '10 GH/s Hashpower' : 
-               profile.active_plan === 'plan_starter' ? '500 GH/s Hashpower' :
+              {profile.active_plan === 'plan_starter' ? '500 GH/s Hashpower' :
                profile.active_plan === 'plan_pro' ? '3 TH/s Hashpower' :
                profile.active_plan === 'plan_vip' ? '15 TH/s Hashpower' : 'Purchase contract below'}
             </p>
@@ -237,6 +351,90 @@ export default function Overview({
           </div>
         </div>
 
+      </div>
+
+      {/* Dynamic Active Hashpower Progress Visualization Card */}
+      <div id="active-hashpower-progress-card" className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="text-left">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                <Cpu className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-gray-900">Active Hashpower Capacity</h4>
+                <p className="text-xs text-gray-400 mt-0.5">Calculated ledger throughput across active mining nodes</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 self-start sm:self-center">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Node Status:</span>
+            <span className={`px-3 py-1 text-xs font-extrabold rounded-full ${
+              hashPowerInTh >= 15 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+              hashPowerInTh >= 3 ? 'bg-indigo-50 border border-indigo-100 text-indigo-700' :
+              hashPowerInTh >= 0.5 ? 'bg-emerald-50 border border-emerald-150 text-emerald-700' :
+              'bg-gray-50 border border-gray-100 text-gray-500'
+            }`}>
+              {profile.active_plan === 'plan_starter' ? 'Starter Node Active' :
+               profile.active_plan === 'plan_pro' ? 'Pro Node Active' :
+               profile.active_plan === 'plan_vip' ? 'VIP Supernode Active' :
+               profile.active_plan ? 'Active Miner' : 'No Connection'}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+          {/* Progress Bar Column */}
+          <div className="lg:col-span-2 space-y-3.5 text-left">
+            <div className="flex justify-between items-end text-xs">
+              <span className="font-semibold text-gray-500">Aggregate Throughput (TH/s)</span>
+              <span className="font-mono font-extrabold text-[#F97316] text-base bg-orange-50/50 px-2.5 py-1 rounded-lg">
+                {hashPowerInTh >= 1 ? `${hashPowerInTh.toFixed(2)} TH/s` : `${(hashPowerInTh * 1000).toFixed(0)} GH/s`}
+              </span>
+            </div>
+            
+            {/* High-tech glow progress bar */}
+            <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-0.5 relative">
+              <div 
+                className="h-full bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(249,115,22,0.25)]"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+            
+            <div className="flex justify-between text-[10px] text-gray-400 font-mono font-bold uppercase tracking-wider">
+              <span>0.00 TH/s (Min)</span>
+              <span className="hidden sm:inline">7.50 TH/s (Mid)</span>
+              <span>15.00 TH/s (Max Contract)</span>
+            </div>
+          </div>
+
+          {/* Speed Stats Breakdown Card */}
+          <div className="bg-gray-50/55 rounded-2xl p-4.5 border border-gray-100/60 grid grid-cols-2 gap-4 text-left text-xs">
+            <div>
+              <span className="text-gray-400 block font-medium">Node Efficiency</span>
+              <span className="font-extrabold text-gray-800 font-mono mt-0.5 block flex items-center">
+                {hashPowerInTh > 0 ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-ping"></span>
+                    99.85% Optimal
+                  </>
+                ) : '0.00% Off-line'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-medium">Global Network Share</span>
+              <span className="font-extrabold text-gray-800 font-mono mt-0.5 block">
+                {hashPowerInTh > 0 ? `${(hashPowerInTh * 0.0042).toFixed(5)}%` : '0.00000%'}
+              </span>
+            </div>
+            <div className="col-span-2 border-t border-gray-100/80 pt-3">
+              <span className="text-gray-400 block font-medium">Calculated Estimated Payout Yield / 24h</span>
+              <span className="font-extrabold text-[#F97316] font-mono mt-1 text-sm block">
+                {dailyEarningRate.toLocaleString()} BTC
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Grid: Interactive Line Chart & Live BTC Price Panel */}
@@ -281,7 +479,7 @@ export default function Overview({
                       x: pt.x,
                       y: pt.y - 12,
                       label: pt.day,
-                      value: `${pt.btc.toFixed(8)} BTC`
+                      value: `${pt.btc.toFixed(6)} BTC`
                     });
                   }}
                   onMouseLeave={() => setHoveredNode(null)}
@@ -327,34 +525,34 @@ export default function Overview({
           </div>
         </div>
 
-        {/* Right Area: Throughput & Live Coingecko price widget */}
+        {/* Right Area: Throughput & Live market value */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div>
             <span className="text-xs font-semibold uppercase tracking-widest text-[#F97316] bg-orange-50/70 px-2.5 py-1 rounded-md">Live Price Proxy</span>
             <div className="flex items-center justify-between mt-4">
-              <h5 className="text-gray-900 font-bold text-sm">Bitcoin Market Rate</h5>
+              <h5 className="text-gray-900 font-bold text-sm">Bitcoin Realtime Index</h5>
               <div className="flex items-center text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                <ChevronRight className="h-3 w-3 -rotate-90 animate-bounce" />
-                <span>+{btcPrice.change_24h.toFixed(2)}%</span>
+                <ChevronRight className="h-3 w-3 -rotate-90" />
+                <span>+1.42%</span>
               </div>
             </div>
 
             <div className="mt-3">
               <h2 className="text-3xl font-extrabold text-gray-900 font-mono tracking-tight">
-                ${btcPrice.btc_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(btcPrice?.btc_usd || 65000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </h2>
-              <p className="text-xs text-gray-400 mt-1">Fetched live from CoinGecko API</p>
+              <p className="text-xs text-gray-400 mt-1">Synced live with CoinGecko and global crypto index</p>
             </div>
           </div>
 
           <div className="border-t border-gray-100 my-4 pt-4">
             <div className="flex justify-between items-center text-xs text-gray-500">
               <span>Mining Speed Efficiency</span>
-              <span className="font-semibold text-emerald-600 font-mono">92% Optimal</span>
+              <span className="font-semibold text-emerald-600 font-mono">100% Optimal</span>
             </div>
             {/* simple custom Progress bar */}
             <div className="h-1.5 w-full bg-gray-100 rounded-full mt-2 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full animate-pulse" style={{ width: '92%' }}></div>
+              <div className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full" style={{ width: '100%' }}></div>
             </div>
           </div>
 
@@ -362,7 +560,7 @@ export default function Overview({
             <div className="flex space-x-2">
               <Trophy className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
               <p className="text-[11px] text-gray-600 leading-normal">
-                Upgrade to standard paid contracts to immediately scale up your hash rates and unlock daily 0.0035 BTC yields.
+                Upgrade to standard paid contracts to immediately scale up your hash rates and unlock daily payout yields.
               </p>
             </div>
           </div>

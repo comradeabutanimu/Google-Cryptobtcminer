@@ -83,6 +83,7 @@ export const api = {
 
   // Financial steps
   createDeposit: (body: any) => request<any>('/api/deposit/create', { method: 'POST', body: JSON.stringify(body) }),
+  createUsdtDeposit: (body: { currency: string; amount: number }) => request<any>('/api/deposit/nowpayments-usdt', { method: 'POST', body: JSON.stringify(body) }),
   getDepositStatus: (invoiceId: string) => request<any>(`/api/deposit/status/${invoiceId}`),
   sandboxTriggerConfirm: (invoiceId: string) => request<any>('/api/deposit/sandbox-trigger-confirm', { method: 'POST', body: JSON.stringify({ invoiceId }) }),
   createWithdrawal: (body: any) => request<any>('/api/withdraw', { method: 'POST', body: JSON.stringify(body) }),

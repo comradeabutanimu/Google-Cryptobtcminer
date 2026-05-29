@@ -20,7 +20,7 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
   const [loading, setLoading] = useState(false);
 
   const maxWithdraw = profile.btc_balance;
-  const minWithdraw = 0.0005;
+  const minWithdraw = 0.0001;
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +32,8 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
     if (amt > maxWithdraw) {
       return toast('Insufficient BTC balance available.', 'error');
     }
-    if (address.trim().length < 24 || !address.trim().startsWith('bc1') && !address.trim().startsWith('1') && !address.trim().startsWith('3')) {
-      return toast('Please submit a valid Bitcoin wallet address (Legacy, SegWit or Native SegWit).', 'error');
+    if (address.trim().length < 10) {
+      return toast('Please submit a valid Bitcoin wallet address.', 'error');
     }
 
     setLoading(true);
@@ -60,8 +60,8 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
       
       {/* Title */}
       <div>
-        <h4 className="text-lg font-bold text-gray-900">Request Bitcoin Cash-out</h4>
-        <p className="text-xs text-gray-400">Withdraw your accrued cloud mining dividends to cold storage</p>
+        <h4 className="text-lg font-bold text-gray-900">Request BTC Cash-out</h4>
+        <p className="text-xs text-gray-400">Withdraw your accrued cloud mining dividends to your secure Bitcoin wallet</p>
       </div>
 
       {/* Available Indicator */}
@@ -69,7 +69,7 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 block">Available for Cash-out</span>
           <h2 className="text-2xl font-extrabold text-gray-900 font-mono tracking-tight mt-1">
-            ₿ {profile.btc_balance.toFixed(8)}
+            {profile.btc_balance.toFixed(8)} BTC
           </h2>
         </div>
         <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center shadow-xs">
@@ -88,11 +88,11 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
             required
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+            placeholder="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkf35rvgmd"
             className="w-full px-4 py-3 border border-gray-100 rounded-xl focus:border-orange-500 text-xs font-mono font-semibold"
           />
           <span className="text-[10px] text-gray-400 block leading-normal">
-            Supports Native SegWit (bc1q...), SegWit (3...), or Legacy P2PKH (1...) btc addresses.
+            Supports standard BTC network transfer addresses (Bech32, SegWit, or Legacy).
           </span>
         </div>
 
@@ -109,17 +109,16 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
             </button>
           </div>
           <div className="relative">
-            <span className="absolute left-4 top-3.5 text-xs text-gray-400 font-bold font-mono">₿</span>
             <input
               type="number"
               required
-              step="0.00000001"
+              step="0.000001"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00500000"
-              className="w-full pl-8 pr-16 py-3 border border-gray-100 rounded-xl focus:border-orange-500 text-sm font-semibold font-mono"
+              placeholder="0.005"
+              className="w-full px-4 py-3 border border-gray-100 rounded-xl focus:border-orange-500 text-sm font-semibold font-mono"
             />
-            <span className="absolute right-4 top-3 text-[10px] text-gray-400 font-semibold uppercase bg-gray-50 px-2 py-1 rounded-md">Bitcoin</span>
+            <span className="absolute right-4 top-3 text-[10px] text-gray-400 font-semibold uppercase bg-gray-50 px-2 py-1 rounded-md">BTC</span>
           </div>
           <div className="flex justify-between text-[10px] text-gray-400 mt-1">
             <span>Minimum cash-out: <strong>{minWithdraw} BTC</strong></span>
