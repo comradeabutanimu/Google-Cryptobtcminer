@@ -13,65 +13,54 @@ import { db } from './server/db.js';
 import { 
   Profile, Plan, Transaction, Deposit, Withdrawal, ActivityLog, Notification, Announcement 
 } from './src/types.js';
-import nodemailer from 'nodemailer';
 import { generateSecret, verifyTOTP } from './server/totp.js';
 
-// Configure dynamic robust SMTP email delivery service with safe default self-healing fallback
+// Configure Brevo REST API transactional email delivery service
 const sendEmail = async (to: string, subject: string, htmlContent: string) => {
-  // Read environments or fall back to proven credentials
-  const envHost = process.env.SMTP_HOST || 'mail.spacemail.com';
-  const envPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const rawUser = process.env.SMTP_USER || 'support@cyptobtcminer.com';
-  const pass = process.env.SMTP_PASS || 'Dauda@2026';
-  
-  // Resiliently correct common brand spelling typos "cryptobtcminer" (with r) -> "cyptobtcminer" (without r) for login authentication
-  const user = rawUser.replace(/cryptobtcminer\.com/gi, 'cyptobtcminer.com');
-  
-  // Use secure: false when using port 587 (STARTTLS). For port 465, use secure: true by default unless specified.
-  const secure = envPort === 465 ? (process.env.SMTP_SECURE !== 'false') : false;
-
-  console.log(`[SMTP] Activating delivery stream to ${to} via ${envHost}:${envPort} as ${user} (Secure: ${secure})`);
-
-  // Sequence of attempt profiles
-  const attempts = [
-    { host: envHost, port: envPort, secure, name: 'Primary Connection' },
-    // If primary port (e.g., 465) times out due to outbound container filters, immediately fall back to verified 587 STARTTLS
-    { host: 'mail.spacemail.com', port: 587, secure: false, name: 'STARTTLS Verified Fallback' }
-  ];
-
-  for (const attempt of attempts) {
-    try {
-      console.log(`[SMTP] Connection attempt: [${attempt.name}] on ${attempt.host}:${attempt.port}...`);
-      const transporter = nodemailer.createTransport({
-        host: attempt.host,
-        port: attempt.port,
-        secure: attempt.secure,
-        auth: {
-          user,
-          pass,
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        connectionTimeout: 8000 // robust timeout boundary
-      });
-
-      const info = await transporter.sendMail({
-        from: `"Crypto BTC Miner Support" <${user}>`,
-        to,
-        subject,
-        html: htmlContent,
-      });
-
-      console.log(`[SMTP SUCCESS] Dispatched message via [${attempt.name}] to ${to}. ID: ${info.messageId}`);
-      return { success: true, messageId: info.messageId };
-    } catch (err: any) {
-      console.warn(`[SMTP WARNING] Relay protocol failed under [${attempt.name}]:`, err.message || err);
-    }
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    console.error('[BREVO ERROR] BREVO_API_KEY is not defined in environment variables.');
+    return { success: false, error: new Error('BREVO_API_KEY is missing.') };
   }
 
-  console.error(`[SMTP ERROR] All SMTP transport channels exhausted for transmission sequence to ${to}`);
-  return { success: false, error: new Error('All SMTP routes timed out or failed verification.') };
+  console.log(`[Brevo] Sending dispatch request to ${to} for "${subject}"`);
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: {
+          name: 'CryptoBTC Miner',
+          email: 'support@cyptobtcminer.com'
+        },
+        to: [
+          {
+            email: to
+          }
+        ],
+        subject: subject,
+        htmlContent: htmlContent
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[BREVO ERROR] API request failed with status ${response.status}:`, errText);
+      return { success: false, error: new Error(`Brevo responded with status ${response.status}: ${errText}`) };
+    }
+
+    const data = await response.json() as { messageId?: string; message?: string };
+    console.log(`[BREVO SUCCESS] Dispatched message to ${to}. Message ID: ${data.messageId || 'Success'}`);
+    return { success: true, messageId: data.messageId };
+  } catch (err: any) {
+    console.error(`[BREVO CRITICAL ERROR] Failed to send email via Brevo REST API:`, err.message || err);
+    return { success: false, error: err };
+  }
 };
 
 async function startServer() {
@@ -2330,8 +2319,9 @@ async function startServer() {
   // To keep the user experience incredibly fluid, our server performs 
   // background mining payouts every 60 seconds for any active cloud miners,
   // making sure they are persisted automatically even when the user is logged out.
-  setInterval(() => {
+  setInterval(async () => {
     try {
+      await updateCachedBtcPrice();
       const profiles = db.getProfiles();
       profiles.forEach(user => {
         if (user.active_plan && !user.is_suspended) {

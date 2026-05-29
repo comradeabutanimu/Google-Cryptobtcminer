@@ -54,6 +54,43 @@ const STATIC_USDT_PLANS = [
   }
 ];
 
+export function getPlanDetails(amountUsd: number) {
+  if (amountUsd >= 50000) {
+    return {
+      id: 'plan_vip',
+      name: 'VIP Supernode',
+      dailyReturnPercent: '3.0%',
+      dailyReturnRate: 0.03,
+      durationDays: 180,
+      hashRateGhs: Math.round(amountUsd / 3),
+      accent: 'from-[#F59E0B] to-[#D97706]',
+      description: '$50,000 minimum and above'
+    };
+  } else if (amountUsd >= 10000) {
+    return {
+      id: 'plan_pro',
+      name: 'Pro Node',
+      dailyReturnPercent: '3.0%',
+      dailyReturnRate: 0.03,
+      durationDays: 90,
+      hashRateGhs: Math.round(amountUsd / 3),
+      accent: 'from-[#F97316] to-[#EA580C]',
+      description: '$10,000 to $49,999'
+    };
+  } else {
+    return {
+      id: 'plan_starter',
+      name: 'Starter Node',
+      dailyReturnPercent: '1.5%',
+      dailyReturnRate: 0.015,
+      durationDays: 60,
+      hashRateGhs: Math.round(amountUsd),
+      accent: 'from-[#F97316] to-[#EA580C]',
+      description: '$500 to $9,999'
+    };
+  }
+}
+
 export default function DepositModal({
   isOpen,
   onClose,
@@ -388,7 +425,7 @@ export default function DepositModal({
                           <span className="text-[9px] text-[#F97316] block font-extrabold uppercase tracking-widest">Hash Rate</span>
                           <span className="text-sm font-black text-white font-mono leading-none block mt-1">
                             {calcValues.hashRateGhs >= 1000
-                              ? `${(calcValues.hashRateGhs / 1000).toLocaleString('en-US', { maxFractionDigits: 2 })} TH/s`
+                              ? `${(calcValues.hashRateGhs / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} TH/s`
                               : `${calcValues.hashRateGhs.toLocaleString()} GH/s`}
                           </span>
                         </div>

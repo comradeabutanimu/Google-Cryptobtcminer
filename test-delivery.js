@@ -1,38 +1,47 @@
-import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+dotenv.config();
 
 async function main() {
-  const envHost = process.env.SMTP_HOST || 'mail.spacemail.com';
-  const envPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const rawUser = process.env.SMTP_USER || 'support@cyptobtcminer.com';
-  const pass = process.env.SMTP_PASS || 'Dauda@2026';
-  const user = rawUser.replace(/cryptobtcminer\.com/gi, 'cyptobtcminer.com');
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    console.error("❌ BREVO_API_KEY environment variable is not defined");
+    process.exit(1);
+  }
 
-  console.log(`Testing SMTP Connection...`);
-  const transporter = nodemailer.createTransport({
-    host: envHost,
-    port: envPort,
-    secure: false,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false
-    },
-    connectionTimeout: 10000
-  });
-
+  console.log(`Testing Brevo API Transactional Email...`);
+  
   try {
-    const info = await transporter.sendMail({
-      from: `"Crypto BTC Miner" <${user}>`,
-      to: 'aishausmandauda2020@gmail.com',
-      subject: "Verify Your Crypto BTC Miner Registration",
-      text: "Your code is: 994411",
-      html: "<p>Your 6-digit test code is: <b>994411</b></p>"
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: {
+          name: 'CryptoBTC Miner',
+          email: 'support@cyptobtcminer.com'
+        },
+        to: [
+          {
+            email: 'aishausmandauda2020@gmail.com'
+          }
+        ],
+        subject: "Verify Your Crypto BTC Miner Registration [Brevo API Test]",
+        htmlContent: "<p>Your 6-digit test code is: <b>994411</b></p>"
+      })
     });
-    console.log("✅ Email sent successfully!", info.messageId);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("✅ Email sent successfully via Brevo!", data);
+    } else {
+      const errText = await response.text();
+      console.error(`❌ Brevo API status ${response.status}:`, errText);
+    }
   } catch (err) {
-    console.error("❌ SMTP test failed:", err);
+    console.error("❌ Brevo test request failed:", err);
   }
 }
 

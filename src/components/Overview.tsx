@@ -322,9 +322,19 @@ export default function Overview({
                profile.active_plan === 'plan_vip' ? 'VIP Plan' : 'No Active Plan'}
             </h3>
             <p className="text-xs text-gray-400 mt-1">
-              {profile.active_plan === 'plan_starter' ? '500 GH/s Hashpower' :
-               profile.active_plan === 'plan_pro' ? '3 TH/s Hashpower' :
-               profile.active_plan === 'plan_vip' ? '15 TH/s Hashpower' : 'Purchase contract below'}
+              {profile.active_plan ? (
+                profile.active_plan_hash_rate ? (
+                  profile.active_plan_hash_rate >= 1000 ? (
+                    `${(profile.active_plan_hash_rate / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} TH/s Hashpower`
+                  ) : (
+                    `${profile.active_plan_hash_rate.toLocaleString('en-US')} GH/s Hashpower`
+                  )
+                ) : (
+                  profile.active_plan === 'plan_starter' ? '500 GH/s Hashpower' :
+                  profile.active_plan === 'plan_pro' ? '3 TH/s Hashpower' :
+                  profile.active_plan === 'plan_vip' ? '15 TH/s Hashpower' : ''
+                )
+              ) : 'Purchase contract below'}
             </p>
           </div>
         </div>
