@@ -19,8 +19,8 @@ import { generateSecret, verifyTOTP } from './server/totp.js';
 const sendEmail = async (to: string, subject: string, htmlContent: string) => {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    console.error('[BREVO ERROR] BREVO_API_KEY is not defined in environment variables.');
-    return { success: false, error: new Error('BREVO_API_KEY is missing.') };
+    console.error('[BREVO ERROR] BREVO_API_KEY not configured');
+    return { success: false, error: new Error('BREVO_API_KEY not configured') };
   }
 
   console.log(`[Brevo] Sending dispatch request to ${to} for "${subject}"`);

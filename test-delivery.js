@@ -4,7 +4,7 @@ dotenv.config();
 async function main() {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    console.error("❌ BREVO_API_KEY environment variable is not defined");
+    console.error("❌ BREVO_API_KEY not configured");
     process.exit(1);
   }
 
