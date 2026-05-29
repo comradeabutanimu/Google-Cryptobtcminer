@@ -80,6 +80,10 @@ async function startServer() {
     next();
   });
 
+  app.get('/logo.png', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'src/assets/images/favicon_1779933297334.png'));
+  });
+
   let cachedBtcPrice = 68420.0;
   let lastBtcFetchAt = 0;
 
@@ -333,12 +337,17 @@ async function startServer() {
 
     console.log(`[AUTH CLIENT] Sent 6-digit registration OTP verification code to ${email}: ${otp}`);
 
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'https';
+    const host = req.get('host');
+    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const logoUrl = `${baseUrl}/logo.png`;
+
     // High-contrast premium styled HTML Email template
     const emailHtml = `
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
           <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
-            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">USDT</span>MINER
+            <img src="${logoUrl}" alt="" style="height: 32px; width: 32px; vertical-align: middle; margin-right: 12px; object-fit: contain;" />CRYPTO<span style="color: #F97316;">BTC</span>MINER
           </div>
           <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
             Register Account Verification
@@ -364,7 +373,7 @@ async function startServer() {
           </p>
           
           <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
-            If you did not initiate this activation request, please immediately ignore this message or report it directly to <a href="mailto:support@cryptousdtminer.com" style="color: #F97316; text-decoration: none;">support@cryptousdtminer.com</a>.
+            If you did not initiate this activation request, please immediately ignore this message or report it directly to <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
           </div>
         </div>
       </div>
@@ -376,7 +385,7 @@ async function startServer() {
     while (attemptsCount < 3) {
       attemptsCount++;
       console.log(`[SMTP] Registration verification email attempt ${attemptsCount}/3 for ${email}`);
-      const stepRes = await sendEmail(email.toLowerCase().trim(), "Verify Your Crypto USDT Miner Registration", emailHtml);
+      const stepRes = await sendEmail(email.toLowerCase().trim(), "Verify Your Crypto BTC Miner Registration", emailHtml);
       if (stepRes && stepRes.success) {
         emailSent = true;
         break;
@@ -523,12 +532,17 @@ async function startServer() {
       timeZoneName: 'short'
     });
 
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'https';
+    const host = req.get('host');
+    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const logoUrl = `${baseUrl}/logo.png`;
+
     const welcomeHtml = `
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 40px 30px; border-radius: 24px; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3); text-align: left;">
           <div style="text-align: center; margin-bottom: 30px;">
             <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 8px;">
-              <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+              <img src="${logoUrl}" alt="" style="height: 32px; width: 32px; vertical-align: middle; margin-right: 12px; object-fit: contain;" />CRYPTO<span style="color: #F97316;">BTC</span>MINER
             </div>
             <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #F97316;">
               Welcome to the Future of Cloud Mining
@@ -942,12 +956,17 @@ async function startServer() {
 
     console.log(`[AUTH CLIENT] Sent 6-digit password reset OTP verification code to ${email}: ${otp}`);
 
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'https';
+    const host = req.get('host');
+    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const logoUrl = `${baseUrl}/logo.png`;
+
     // High-contrast premium styled HTML Email template
     const emailHtml = `
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
           <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 24px;">
-            <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">USDT</span>MINER
+            <img src="${logoUrl}" alt="" style="height: 32px; width: 32px; vertical-align: middle; margin-right: 12px; object-fit: contain;" />CRYPTO<span style="color: #F97316;">BTC</span>MINER
           </div>
           <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #A8A29E; margin-bottom: 12px;">
             Security Recovery Code
@@ -973,7 +992,7 @@ async function startServer() {
           </p>
           
           <div style="border-top: 1px solid #1C1917; padding-top: 20px; font-size: 11px; color: #57534E; line-height: 1.5;">
-            To secure your account immediately, do not verify or register this code, and reach out to our emergency support operations at <a href="mailto:support@cryptousdtminer.com" style="color: #F97316; text-decoration: none;">support@cryptousdtminer.com</a>.
+            To secure your account immediately, do not verify or register this code, and reach out to our emergency support operations at <a href="mailto:support@cryptobtcminer.com" style="color: #F97316; text-decoration: none;">support@cryptobtcminer.com</a>.
           </div>
         </div>
       </div>
@@ -985,7 +1004,7 @@ async function startServer() {
     while (attemptsCount < 3) {
       attemptsCount++;
       console.log(`[SMTP] Forgot password reset attempt ${attemptsCount}/3 for ${emailKey}`);
-      const stepRes = await sendEmail(emailKey, "Reset Your Crypto USDT Cloud Password", emailHtml);
+      const stepRes = await sendEmail(emailKey, "Reset Your Crypto BTC Cloud Password", emailHtml);
       if (stepRes && stepRes.success) {
         emailSent = true;
         break;
@@ -1050,13 +1069,18 @@ async function startServer() {
     // Clear verification map record
     forgotPasswordOtps.delete(emailKey);
 
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'https';
+    const host = req.get('host');
+    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const logoUrl = `${baseUrl}/logo.png`;
+
     // Send security notification email to confirm password update
     const resetSuccessHtml = `
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #FAFAF9; color: #1C1917;">
         <div style="background-color: #0C0A09; padding: 40px 30px; border-radius: 24px; border: 1px solid #27272A; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3); text-align: left;">
           <div style="text-align: center; margin-bottom: 30px;">
             <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.025em; margin-bottom: 8px;">
-              <span style="color: #F97316;">✓</span> CRYPTO<span style="color: #F97316;">BTC</span>MINER
+              <img src="${logoUrl}" alt="" style="height: 32px; width: 32px; vertical-align: middle; margin-right: 12px; object-fit: contain;" />CRYPTO<span style="color: #F97316;">BTC</span>MINER
             </div>
             <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #F97316;">
               Security Confirmation Notification
