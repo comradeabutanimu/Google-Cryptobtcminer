@@ -1838,17 +1838,21 @@ export default function App() {
                   )}
 
                   {dashboardTab === 'plans' && (
-                    <div className="space-y-6">
-                      <div className="pb-4 border-b border-gray-100 text-center">
-                        <h3 className="text-xl font-extrabold text-neutral-900">Catalogs available paid mining contracts</h3>
-                        <p className="text-xs text-gray-400 mt-1">Deploy Starter or VIP hash rates to instantly amplify daily payouts</p>
+                    <div className="w-full min-h-[calc(100vh-180px)] md:min-h-[calc(100vh-140px)] flex flex-col justify-center items-center py-6">
+                      <div className="w-full max-w-6xl space-y-8 flex flex-col justify-center">
+                        <div className="pb-4 border-b border-gray-100 text-center">
+                          <h3 className="text-xl font-extrabold text-neutral-900">Catalogs available paid mining contracts</h3>
+                          <p className="text-xs text-gray-400 mt-1">Deploy Starter or VIP hash rates to instantly amplify daily payouts</p>
+                        </div>
+                        <div className="flex justify-center items-center w-full">
+                          <Plans 
+                            plans={plans}
+                            activePlanId={userProfile.active_plan}
+                            onSelectPlan={handleSelectPlanLaunchDeposit}
+                            isDashboard={true}
+                          />
+                        </div>
                       </div>
-                      <Plans 
-                        plans={plans}
-                        activePlanId={userProfile.active_plan}
-                        onSelectPlan={handleSelectPlanLaunchDeposit}
-                        isDashboard={true}
-                      />
                     </div>
                   )}
 

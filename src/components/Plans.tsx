@@ -15,7 +15,7 @@ interface PlansProps {
 
 export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard = false }: PlansProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+    <div className="flex flex-wrap justify-center items-stretch gap-8 w-full max-w-6xl mx-auto">
       {plans.map((plan) => {
         const isPro = plan.id === 'plan_pro';
         const isActive = activePlanId === plan.id;
@@ -23,7 +23,7 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
         return (
           <div
             key={plan.id}
-            className={`relative rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between ${
+            className={`relative rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between w-full max-w-[380px] md:max-w-[340px] lg:max-w-[290px] xl:max-w-[340px] shrink-0 ${
               isActive
                 ? 'bg-neutral-800 text-white border-2 border-[#F97316] ring-4 ring-[#F97316]/10 scale-102 shadow-lg'
                 : isPro

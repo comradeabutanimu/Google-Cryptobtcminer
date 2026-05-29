@@ -166,6 +166,40 @@ export default function Overview({
     }) + ' USD';
   };
 
+  // Let's compute locked principal
+  const btcPriceUsd = btcPrice?.btc_usd || 68420.0;
+  
+  // Calculate active principal in USD
+  let lockedUsd = 0;
+  let isLocked = false;
+  let countdownText = 'No active deposit';
+  
+  if (profile.active_plan) {
+    const now = Date.now();
+    const expiryTime = profile.plan_expires_at ? new Date(profile.plan_expires_at).getTime() : 0;
+    if (expiryTime > now) {
+      isLocked = true;
+      lockedUsd = profile.active_plan_investment || 0;
+      if (lockedUsd <= 0) {
+        if (profile.active_plan === 'plan_starter') lockedUsd = 500;
+        else if (profile.active_plan === 'plan_pro') lockedUsd = 10000;
+        else if (profile.active_plan === 'plan_vip') lockedUsd = 50000;
+      }
+      
+      const timeRemainingMs = expiryTime - now;
+      const daysRemaining = Math.max(0, Math.ceil(timeRemainingMs / (24 * 60 * 60 * 1000)));
+      countdownText = `${daysRemaining} days remaining until unlock`;
+    } else {
+      countdownText = 'Contract expired (Unlocked)';
+    }
+  }
+  
+  const lockedBtc = isLocked && btcPriceUsd > 0 ? lockedUsd / btcPriceUsd : 0;
+  
+  // Available BTC is liveBtc - lockedBtc
+  const availableBtcVal = Math.max(0, liveBtc - lockedBtc);
+  const availableUsdVal = availableBtcVal * btcPriceUsd;
+
   // Extract recent activities
   const miningTransactions = transactions.filter(t => t.type === 'mining');
   
@@ -229,10 +263,10 @@ export default function Overview({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* Card 1: BTC Balance */}
+        {/* Card 1: Available Balance */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-gray-500 text-sm font-medium">BTC Balance</span>
+            <span className="text-gray-500 text-sm font-medium">Available Balance</span>
             <button 
               onClick={handleBlurToggle}
               className="text-gray-400 hover:text-orange-500 transition-colors p-1"
@@ -252,9 +286,9 @@ export default function Overview({
                   repeat: Infinity, 
                   ease: "easeInOut" 
                 }}
-                className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}
+                className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-emerald-600'}`}
               >
-                {formattedBtc(liveBtc)} BTC
+                {formattedBtc(availableBtcVal)} BTC
               </motion.h3>
               {!blur && profile.active_plan && (
                 <motion.span
@@ -273,15 +307,15 @@ export default function Overview({
               )}
             </div>
             <p className={`text-xs text-gray-400 mt-1 transition-all duration-300 ${blur ? 'select-none filter blur-md' : ''}`}>
-              {profile.active_plan ? 'Mining rate active' : 'Miner inactive'}
+              Withdrawable profits (~{formattedUsd(availableUsdVal)})
             </p>
           </div>
         </div>
 
-        {/* Card 2: USD Value */}
+        {/* Card 2: Locked Balance */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-gray-500 text-sm font-medium">Estimated USD Value</span>
+            <span className="text-gray-500 text-sm font-medium">Locked Balance</span>
             <div className="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center">
               <Coins className="h-4 w-4 text-orange-500" />
             </div>
@@ -289,7 +323,7 @@ export default function Overview({
           <div className="mt-4 flex flex-col justify-end">
             <motion.h3 
               animate={{ 
-                textShadow: ["0 0 0px rgba(16,185,129,0)", "0 0 6px rgba(16,185,129,0.3)", "0 0 0px rgba(16,185,129,0)"]
+                textShadow: ["0 0 0px rgba(249,115,22,0)", "0 0 6px rgba(249,115,22,0.3)", "0 0 0px rgba(249,115,22,0)"]
               }}
               transition={{ 
                 duration: 2.5, 
@@ -299,10 +333,10 @@ export default function Overview({
               }}
               className={`text-2xl font-bold font-mono tracking-tight transition-all duration-300 ${blur ? 'select-none filter blur-md' : 'text-gray-900'}`}
             >
-              {formattedUsd(liveBtc * (btcPrice?.btc_usd || 65000))}
+              {lockedUsd > 0 ? `${lockedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` : '0.00 USDT'}
             </motion.h3>
-            <p className="text-xs text-gray-400 mt-1">
-              Main account ledger
+            <p className={`text-xs mt-1 font-semibold transition-all duration-300 ${isLocked ? 'text-orange-600' : 'text-gray-400'} ${blur ? 'select-none filter blur-md' : ''}`}>
+              {countdownText}
             </p>
           </div>
         </div>

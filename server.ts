@@ -217,18 +217,36 @@ async function startServer() {
 
     // Turn off plan if we reached raw expiration
     if (now >= expiryTime) {
-      user.active_plan = null;
+      const expiredPlanId = user.active_plan;
+      let usd = user.active_plan_investment || 0;
+      if (usd <= 0) {
+        if (expiredPlanId === 'plan_starter') usd = 500;
+        else if (expiredPlanId === 'plan_pro') usd = 10000;
+        else if (expiredPlanId === 'plan_vip') usd = 50000;
+      }
+
       const planName = isDynamicContract 
-        ? (user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
+        ? (expiredPlanId === 'plan_starter' ? 'Starter Plan' : expiredPlanId === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
         : (userPlan?.name || 'USDT Miner');
       const durationDays = isDynamicContract 
-        ? (user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180) 
+        ? (expiredPlanId === 'plan_starter' ? 60 : expiredPlanId === 'plan_pro' ? 90 : 180) 
         : (userPlan?.duration_days || 60);
+
+      user.active_plan = null;
 
       db.addNotification({
         id: 'not_exp_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
         message: `Your cloud mining contract (${planName}) has reached its maturity term of ${durationDays} days and stopped. Buy a new contract to continue.`,
+        is_read: false,
+        created_at: new Date(expiryTime).toISOString()
+      });
+
+      // Rule 6: Send user a notification saying their capital is now unlocked and withdrawable
+      db.addNotification({
+        id: 'not_unlock_' + Math.random().toString(36).substr(2, 9),
+        user_id: user.id,
+        message: `Your deposit of ${usd} USDT has unlocked and is now available for withdrawal.`,
         is_read: false,
         created_at: new Date(expiryTime).toISOString()
       });
@@ -1697,6 +1715,9 @@ async function startServer() {
 
     // Executting Payout confirmations
     deposit.status = 'confirmed';
+    if (deposit.amount_btc === 0 && deposit.amount_usd > 0) {
+      deposit.amount_btc = Number((deposit.amount_usd / (cachedBtcPrice || 68420.0)).toFixed(8));
+    }
     db.updateDeposit(deposit);
 
     // Apply BTC credit safely (if any, usdt deposits default btc to 0)
@@ -1753,8 +1774,49 @@ async function startServer() {
       return res.status(400).json({ error: 'Please specify a valid, full BTC crypto receiving address.' });
     }
 
-    if (user.btc_balance < btcAmount) {
-      return res.status(400).json({ error: 'Insufficient BTC balance for this withdrawal.' });
+    // Calculate locked principal
+    let lockedUsd = 0;
+    const now = Date.now();
+    let isLocked = false;
+    let expiryDateString = '';
+
+    if (user.active_plan) {
+      const expiryTime = user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : 0;
+      if (expiryTime > now) {
+        isLocked = true;
+        lockedUsd = user.active_plan_investment || 0;
+        if (lockedUsd <= 0) {
+          if (user.active_plan === 'plan_starter') lockedUsd = 500;
+          else if (user.active_plan === 'plan_pro') lockedUsd = 10000;
+          else if (user.active_plan === 'plan_vip') lockedUsd = 50000;
+        }
+        
+        // Formatted date [expiry date]
+        expiryDateString = new Date(user.plan_expires_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+    }
+
+    const btcUsdPrice = cachedBtcPrice || 68420.0;
+    const lockedBtc = isLocked && btcUsdPrice > 0 ? Number((lockedUsd / btcUsdPrice).toFixed(8)) : 0;
+    const availableBtc = Number(Math.max(0, user.btc_balance - lockedBtc).toFixed(8));
+
+    // Rule 2 & 5: Minimum withdrawal check ($7 USD worth of BTC)
+    const minWithdrawalBtc = Number((7 / btcUsdPrice).toFixed(8));
+    if (btcAmount < minWithdrawalBtc) {
+      return res.status(400).json({ error: `Minimum withdrawal amount is $7 worth of BTC (${minWithdrawalBtc.toFixed(8)} BTC).` });
+    }
+
+    // Rule 5 validation: If amount includes locked principal
+    if (btcAmount > availableBtc) {
+      if (isLocked) {
+        return res.status(400).json({ error: `Your deposit of ${lockedUsd} USDT is locked until ${expiryDateString}. Only mining profits are withdrawable.` });
+      } else if (user.btc_balance < btcAmount) {
+        return res.status(400).json({ error: 'Insufficient BTC balance for this withdrawal.' });
+      }
     }
 
     // Subtract and log immediately
@@ -1822,6 +1884,9 @@ async function startServer() {
         const user = profiles.find(p => p.id === deposit.user_id);
         
         if (user) {
+          if (deposit.amount_btc === 0 && deposit.amount_usd > 0) {
+            deposit.amount_btc = Number((deposit.amount_usd / (cachedBtcPrice || 68420.0)).toFixed(8));
+          }
           user.btc_balance = Number((user.btc_balance + deposit.amount_btc).toFixed(8));
           
           activateDynamicPlanForUser(user, deposit.amount_usd);
@@ -2200,6 +2265,9 @@ async function startServer() {
     }
 
     depositIndex.status = 'confirmed';
+    if (depositIndex.amount_btc === 0 && depositIndex.amount_usd > 0) {
+      depositIndex.amount_btc = Number((depositIndex.amount_usd / (cachedBtcPrice || 68420.0)).toFixed(8));
+    }
     db.updateDeposit(depositIndex);
 
     if (user) {
