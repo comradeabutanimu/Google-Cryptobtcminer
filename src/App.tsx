@@ -457,7 +457,7 @@ export default function App() {
       const res = await api.getBtcPrice();
       setBtcPrice(res);
     } catch (e) {
-      console.error('Error proxying coin market rates.');
+      console.warn('Coin market rates proxy is temporarily using fallback price:', e);
     }
   };
 
