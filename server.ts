@@ -779,7 +779,10 @@ async function startServer() {
           'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
           'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
           'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
-          'NG': 'ha',
+          'CN': 'zh',
+          'IN': 'hi',
+          'RU': 'ru',
+          'NG': 'en',
           'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
         };
         user.detected_language = langMapping[countryCode] || 'en';

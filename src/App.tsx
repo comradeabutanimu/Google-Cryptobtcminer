@@ -154,11 +154,15 @@ export default function App() {
   // Localization states
   const [currentLang, setCurrentLang] = useState<LanguageCode>(() => {
     const saved = localStorage.getItem('cryptobtc_miner_lang');
-    if (saved && ['en', 'fr', 'ar', 'es', 'pt', 'ha', 'sw'].includes(saved)) {
+    if (saved && ['en', 'fr', 'ar', 'es', 'pt', 'zh', 'hi', 'ru', 'sw'].includes(saved)) {
       return saved as LanguageCode;
     }
     return 'en';
   });
+
+  useEffect(() => {
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+  }, [currentLang]);
 
   const t = translations[currentLang] || translations['en'];
 
@@ -334,7 +338,7 @@ export default function App() {
           setUserProfile(profileRes);
           setIsLoggedIn(true);
 
-          if (profileRes.detected_language && ['en', 'fr', 'ar', 'es', 'pt', 'ha', 'sw'].includes(profileRes.detected_language)) {
+          if (profileRes.detected_language && ['en', 'fr', 'ar', 'es', 'pt', 'zh', 'hi', 'ru', 'sw'].includes(profileRes.detected_language)) {
             setCurrentLang(profileRes.detected_language as LanguageCode);
             localStorage.setItem('cryptobtc_miner_lang', profileRes.detected_language);
           }
@@ -384,7 +388,10 @@ export default function App() {
                   'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
                   'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
                   'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
-                  'NG': 'ha',
+                  'CN': 'zh',
+                  'IN': 'hi',
+                  'RU': 'ru',
+                  'NG': 'en',
                   'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
                 };
                 const detectedL = langMapping[countryCode] || 'en';
@@ -402,7 +409,10 @@ export default function App() {
                     'FR': 'fr', 'CA': 'fr', 'CD': 'fr', 'CG': 'fr', 'CI': 'fr', 'SN': 'fr', 'NE': 'fr', 'ML': 'fr',
                     'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es', 'PE': 'es', 'VE': 'es',
                     'PT': 'pt', 'BR': 'pt', 'AO': 'pt', 'MZ': 'pt',
-                    'NG': 'ha',
+                    'CN': 'zh',
+                    'IN': 'hi',
+                    'RU': 'ru',
+                    'NG': 'en',
                     'KE': 'sw', 'TZ': 'sw', 'UG': 'sw'
                   };
                   const detectedL = langMapping[countryCode] || 'en';
@@ -1747,7 +1757,7 @@ export default function App() {
                   >
                     {LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name.substring(0, 3)}
+                        {lang.flag} {['zh', 'hi', 'ru'].includes(lang.code) ? lang.name.split(' ')[0] : lang.name.substring(0, 3)}
                       </option>
                     ))}
                   </select>
