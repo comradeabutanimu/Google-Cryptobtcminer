@@ -168,6 +168,67 @@ async function startServer() {
     user.last_mining_at = new Date().toISOString();
   }
 
+  function creditReferralCommission(depositorId: string, amountUsd: number, amountBtc = 0) {
+    const profiles = db.getProfiles();
+    const depositor = profiles.find(p => p.id === depositorId);
+    if (!depositor || !depositor.referred_by) {
+      return;
+    }
+
+    const referrer = profiles.find(p => p.id === depositor.referred_by);
+    if (!referrer) {
+      return;
+    }
+
+    const btcPrice = cachedBtcPrice || 68420.0;
+    let finalUsd = amountUsd;
+    if (finalUsd <= 0 && amountBtc > 0) {
+      finalUsd = Number((amountBtc * btcPrice).toFixed(2));
+    }
+
+    if (finalUsd <= 0) {
+      return;
+    }
+
+    const commissionUsd = finalUsd * 0.10;
+    const commissionBtc = Number((commissionUsd / btcPrice).toFixed(8));
+
+    if (commissionBtc <= 0) {
+      return;
+    }
+
+    referrer.btc_balance = Number((referrer.btc_balance + commissionBtc).toFixed(8));
+    db.updateProfile(referrer);
+
+    db.addTransaction({
+      id: 'tx_ref_comm_' + Math.random().toString(36).substr(2, 9),
+      user_id: referrer.id,
+      type: 'referral',
+      description: `Referral commission from ${depositor.full_name || depositor.email} ($${finalUsd} USDT deposit)`,
+      amount_btc: commissionBtc,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: referrer.id,
+      message: `You earned ${commissionBtc.toFixed(8)} BTC referral commission from your referral's deposit of $${finalUsd}`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: referrer.id,
+      action: 'Referral Commission Paid',
+      details: `Earned ${commissionBtc} BTC commission from referral ${depositor.id} deposit of $${finalUsd} USD.`,
+      created_at: new Date().toISOString()
+    });
+
+    console.log(`[Referral Engine] Credited ${commissionBtc} BTC referral commission to referrer ${referrer.email} for depositor ${depositor.email}'s deposit of $${finalUsd}`);
+  }
+
   const processMining = (user: any) => {
     if (user.is_suspended) {
       return;
@@ -1808,6 +1869,9 @@ async function startServer() {
     activateDynamicPlanForUser(user, deposit.amount_usd);
     db.updateProfile(user);
 
+    // Apply referral commission credit
+    creditReferralCommission(user.id, deposit.amount_usd, deposit.amount_btc);
+
     // Record complete logs and notifies
     db.addTransaction({
       id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
@@ -1971,6 +2035,9 @@ async function startServer() {
           
           activateDynamicPlanForUser(user, deposit.amount_usd);
           db.updateProfile(user);
+
+          // Apply referral commission credit
+          creditReferralCommission(user.id, deposit.amount_usd, deposit.amount_btc);
 
           db.addTransaction({
             id: 'tx_pay_hk_' + Math.random().toString(36).substr(2, 9),
@@ -2362,6 +2429,9 @@ async function startServer() {
         user.last_mining_at = new Date().toISOString();
       }
       db.updateProfile(user);
+
+      // Apply referral commission credit
+      creditReferralCommission(user.id, depositIndex.amount_usd, depositIndex.amount_btc);
 
       db.addTransaction({
         id: 'tx_pay_man_' + Math.random().toString(36).substr(2, 9),
