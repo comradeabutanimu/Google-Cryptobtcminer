@@ -111,7 +111,7 @@ async function startServer() {
 
     if (amountUsd >= 50000) {
       planId = 'plan_vip';
-      rate = 0.03;
+      rate = 0.05;
       durationDays = 180;
       hashRateGhs = Math.round(amountUsd / 3);
     } else if (amountUsd >= 10000) {
@@ -135,26 +135,39 @@ async function startServer() {
       return;
     }
 
-    const plansList = db.getPlans();
-    const userPlan = plansList.find(p => p.id === user.active_plan);
-    
-    // Check if it is a dynamic contract
-    const isDynamicContract = !!(user.active_plan_investment && user.active_plan_rate);
-
-    if (!isDynamicContract && (!userPlan || !userPlan.is_active)) {
-      return;
-    }
-
     const now = Date.now();
 
-    // Setup fallback dates defensively
+    // 1. Calculate profit based on the user's actual deposited USD amount stored in locked_capital or deposit_usd_value field (or active_plan_investment or fallback values)
+    let usdAmount = Number(user.locked_capital || user.deposit_usd_value || user.active_plan_investment || 0);
+    
+    // Fallback based on plan if usdAmount is 0/undefined
+    if (usdAmount <= 0) {
+      if (user.active_plan === 'plan_starter') {
+        usdAmount = 500;
+      } else if (user.active_plan === 'plan_pro') {
+        usdAmount = 10000;
+      } else if (user.active_plan === 'plan_vip') {
+        usdAmount = 50000;
+      }
+    }
+
+    // Daily percentage is 5% (0.05) on deposited amount for all plans as requested by background payout rules
+    const dailyReturnRate = 0.05;
+    const dailyUsdProfit = usdAmount * dailyReturnRate;
+
+    // Convert daily profit percentage to per-minute rate (divide by 1440 minutes in a day)
+    const usdProfitPerMinute = dailyUsdProfit / 1440;
+
+    // Convert USD profit to BTC using live CoinGecko price
+    const btcPriceToUse = cachedBtcPrice || 68420.0;
+    const btcProfitPerMinute = usdProfitPerMinute / btcPriceToUse;
+
+    // Define expiry duration and dates
     if (!user.plan_activated_at) {
       user.plan_activated_at = user.created_at || new Date().toISOString();
     }
     if (!user.plan_expires_at) {
-      const durationDays = isDynamicContract 
-        ? (user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180) 
-        : (userPlan?.duration_days || 60);
+      const durationDays = user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180;
       const planDurationMs = durationDays * 24 * 60 * 60 * 1000;
       const startMs = new Date(user.plan_activated_at).getTime();
       user.plan_expires_at = new Date(startMs + planDurationMs).toISOString();
@@ -177,18 +190,11 @@ async function startServer() {
     const elapsedMs = activeEnd - lastTime;
 
     if (elapsedMs > 0) {
-      let dailyEarn = 0;
-      if (isDynamicContract) {
-        dailyEarn = (user.active_plan_investment * user.active_plan_rate) / cachedBtcPrice;
-      } else {
-        dailyEarn = userPlan?.daily_earn_btc || 0;
-      }
+      // Calculate how many minutes (or fractions) have elapsed
+      const elapsedMinutes = elapsedMs / 60000.0;
+      const earned = elapsedMinutes * btcProfitPerMinute;
 
-      const earned = elapsedMs * (dailyEarn / 86400000);
-
-      const planName = isDynamicContract 
-        ? (user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
-        : (userPlan?.name || 'USDT Miner');
+      const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
 
       if (earned > 0.00000001) {
         user.btc_balance = Number((user.btc_balance + earned).toFixed(8));
@@ -217,22 +223,9 @@ async function startServer() {
 
     // Turn off plan if we reached raw expiration
     if (now >= expiryTime) {
-      const expiredPlanId = user.active_plan;
-      let usd = user.active_plan_investment || 0;
-      if (usd <= 0) {
-        if (expiredPlanId === 'plan_starter') usd = 500;
-        else if (expiredPlanId === 'plan_pro') usd = 10000;
-        else if (expiredPlanId === 'plan_vip') usd = 50000;
-      }
-
-      const planName = isDynamicContract 
-        ? (expiredPlanId === 'plan_starter' ? 'Starter Plan' : expiredPlanId === 'plan_pro' ? 'Pro Plan' : 'VIP Plan')
-        : (userPlan?.name || 'USDT Miner');
-      const durationDays = isDynamicContract 
-        ? (expiredPlanId === 'plan_starter' ? 60 : expiredPlanId === 'plan_pro' ? 90 : 180) 
-        : (userPlan?.duration_days || 60);
-
       user.active_plan = null;
+      const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
+      const durationDays = user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180;
 
       db.addNotification({
         id: 'not_exp_' + Math.random().toString(36).substr(2, 9),
@@ -242,11 +235,10 @@ async function startServer() {
         created_at: new Date(expiryTime).toISOString()
       });
 
-      // Rule 6: Send user a notification saying their capital is now unlocked and withdrawable
       db.addNotification({
         id: 'not_unlock_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
-        message: `Your deposit of ${usd} USDT has unlocked and is now available for withdrawal.`,
+        message: `Your deposit of ${usdAmount} USDT has unlocked and is now available for withdrawal.`,
         is_read: false,
         created_at: new Date(expiryTime).toISOString()
       });

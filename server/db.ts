@@ -62,7 +62,7 @@ const DEFAULT_PLANS: Plan[] = [
     name: 'VIP',
     price_btc: 50000,
     hash_rate: '15 TH/s',
-    daily_earn_btc: 0.02735043, // equivalent to ($320,000 total return / 180 days) at $65,000 BTC reference price
+    daily_earn_btc: 0.03846154, // equivalent to ($2,500 daily return based on 5%) at $65,000 BTC reference price
     duration_days: 180,
     is_active: true,
     created_at: new Date().toISOString()

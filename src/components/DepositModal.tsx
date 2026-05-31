@@ -46,10 +46,10 @@ const STATIC_USDT_PLANS = [
     name: 'VIP Supernode',
     hashRate: '15 TH/s',
     priceUsdt: 50000,
-    dailyReturn: '3.0%',
+    dailyReturn: '5.0%',
     duration: 180,
-    totalProfit: 270000,
-    totalReturn: 320000,
+    totalProfit: 225000,
+    totalReturn: 275000,
     accent: 'from-[#F59E0B] to-[#D97706]'
   }
 ];
@@ -59,8 +59,8 @@ export function getPlanDetails(amountUsd: number) {
     return {
       id: 'plan_vip',
       name: 'VIP Supernode',
-      dailyReturnPercent: '3.0%',
-      dailyReturnRate: 0.03,
+      dailyReturnPercent: '5.0%',
+      dailyReturnRate: 0.05,
       durationDays: 180,
       hashRateGhs: Math.round(amountUsd / 3),
       accent: 'from-[#F59E0B] to-[#D97706]',
@@ -230,7 +230,7 @@ export default function DepositModal({
     const plan = getPlanDetails(amount);
     
     const dailyProfit = amount * plan.dailyReturnRate;
-    const totalProfit = dailyProfit * plan.durationDays;
+    const totalProfit = plan.id === 'plan_vip' ? (amount * 4.5) : (dailyProfit * plan.durationDays);
     const totalReturn = amount + totalProfit;
 
     return {

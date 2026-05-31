@@ -60,7 +60,7 @@ export default function Overview({
         // fallback matching default configuration values
         if (profile.active_plan === 'plan_starter') dailyEarn = 0.00024359;
         else if (profile.active_plan === 'plan_pro') dailyEarn = 0.00632479;
-        else if (profile.active_plan === 'plan_vip') dailyEarn = 0.02735043;
+        else if (profile.active_plan === 'plan_vip') dailyEarn = 0.03846154;
       }
     }
 
@@ -151,7 +151,7 @@ export default function Overview({
     } else {
       if (profile.active_plan === 'plan_starter') dailyEarningRate = 0.00024359;
       else if (profile.active_plan === 'plan_pro') dailyEarningRate = 0.00632479;
-      else if (profile.active_plan === 'plan_vip') dailyEarningRate = 0.02735043;
+      else if (profile.active_plan === 'plan_vip') dailyEarningRate = 0.03846154;
     }
   }
 

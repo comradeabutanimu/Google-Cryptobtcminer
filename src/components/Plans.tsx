@@ -94,13 +94,13 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
                 <li className="flex items-center space-x-3 text-sm">
                   <TrendingUp className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`} />
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
-                    Daily Return: <strong>{plan.id === 'plan_starter' ? '1.5%' : '3%'} / day</strong>
+                    Daily Return: <strong>{plan.id === 'plan_starter' ? '1.5%' : plan.id === 'plan_pro' ? '3%' : '5%'} / day</strong>
                   </span>
                 </li>
                 <li className={`flex items-center space-x-3 text-sm ${isPro || isActive ? 'text-emerald-200' : 'text-emerald-600'}`}>
                   <TrendingUp className={`h-4 w-4 shrink-0 ${isPro || isActive ? 'text-emerald-200' : 'text-emerald-500'}`} />
                   <span>
-                    Daily Profit: <strong>{plan.id === 'plan_starter' ? '$7.50/day' : plan.id === 'plan_pro' ? '$300.00/day' : '$1,500.00/day'}</strong>
+                    Daily Profit: <strong>{plan.id === 'plan_starter' ? '$7.50/day' : plan.id === 'plan_pro' ? '$300.00/day' : '$2,500.00/day'}</strong>
                   </span>
                 </li>
                 <li className="flex items-center space-x-3 text-sm">
@@ -112,13 +112,13 @@ export default function Plans({ plans, activePlanId, onSelectPlan, isDashboard =
                 <li className="flex items-center space-x-3 text-sm">
                   <span className={`h-4 w-4 shrink-0 flex items-center justify-center font-extrabold text-xs leading-none ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`}>$</span>
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
-                    Total Profit: <strong>{plan.id === 'plan_starter' ? '$450 USDT' : plan.id === 'plan_pro' ? '$27,000 USDT' : '$270,000 USDT'}</strong>
+                    Total Profit: <strong>{plan.id === 'plan_starter' ? '$450 USDT' : plan.id === 'plan_pro' ? '$27,000 USDT' : '$225,000 USDT'}</strong>
                   </span>
                 </li>
                 <li className={`flex items-center space-x-3 text-sm border-t border-dashed pt-2.5 mt-2.5 ${isPro || isActive ? 'border-white/20' : 'border-[#E7E7E4]'}`}>
                   <span className={`h-4 w-4 shrink-0 flex items-center justify-center font-extrabold text-xs leading-none ${isPro || isActive ? 'text-white' : 'text-[#F97316]'}`}>Σ</span>
                   <span className={isPro || isActive ? 'text-white/90' : isDashboard ? 'text-[#4B5563]' : 'text-[#D1D5DB]'}>
-                    Total Return: <strong>{plan.id === 'plan_starter' ? '$950' : plan.id === 'plan_pro' ? '$37,000' : '$320,000'}</strong> <span className="text-[10px] opacity-75 font-normal">(capital + profit)</span>
+                    Total Return: <strong>{plan.id === 'plan_starter' ? '$950' : plan.id === 'plan_pro' ? '$37,000' : '$275,000'}</strong> <span className="text-[10px] opacity-75 font-normal">(capital + profit)</span>
                   </span>
                 </li>
               </ul>
