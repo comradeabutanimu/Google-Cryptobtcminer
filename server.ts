@@ -1361,10 +1361,12 @@ async function startServer() {
 
       if (user.btc_balance >= PriceInBtc) {
         user.btc_balance = Number((user.btc_balance - PriceInBtc).toFixed(8));
-        user.active_plan = plan.id;
-        user.plan_activated_at = new Date().toISOString();
-        user.plan_expires_at = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString();
-        user.last_mining_at = new Date().toISOString();
+        
+        // Properly set locked_capital, deposit_usd_value, and activate dynamic parameters for background mining
+        user.locked_capital = Number(plan.price_btc);
+        user.deposit_usd_value = Number(plan.price_btc);
+        activateDynamicPlanForUser(user, plan.price_btc);
+        
         db.updateProfile(user);
 
         db.addTransaction({
