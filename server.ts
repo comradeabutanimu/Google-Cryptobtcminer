@@ -89,6 +89,8 @@ async function startServer() {
 
   async function updateCachedBtcPrice() {
     const now = Date.now();
+    
+    // Main fetch: CoinGecko
     try {
       const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
       if (response.ok) {
@@ -96,11 +98,47 @@ async function startServer() {
         if (data.bitcoin?.usd) {
           cachedBtcPrice = Number(data.bitcoin.usd);
           lastBtcFetchAt = now;
+          console.log(`[BTC Price Core] Fetched from CoinGecko: $${cachedBtcPrice}`);
+          return;
         }
       }
-    } catch (e) {
-      // Ignore
+    } catch (e: any) {
+      console.warn(`[BTC Price Core] CoinGecko fetch failed: ${e.message || e}`);
     }
+
+    // Fallback 1: Blockchain.info Ticker
+    try {
+      const response = await fetch('https://blockchain.info/ticker');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.USD?.last) {
+          cachedBtcPrice = Number(data.USD.last);
+          lastBtcFetchAt = now;
+          console.log(`[BTC Price Core] Fetched from Blockchain.info fallback: $${cachedBtcPrice}`);
+          return;
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[BTC Price Core] Blockchain.info fallback failed: ${e.message || e}`);
+    }
+
+    // Fallback 2: Coinbase Spot Price
+    try {
+      const response = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data?.amount) {
+          cachedBtcPrice = Number(data.data.amount);
+          lastBtcFetchAt = now;
+          console.log(`[BTC Price Core] Fetched from Coinbase fallback: $${cachedBtcPrice}`);
+          return;
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[BTC Price Core] Coinbase fallback failed: ${e.message || e}`);
+    }
+
+    console.log(`[BTC Price Core] Utilizing last known price: $${cachedBtcPrice}`);
   }
 
   function activateDynamicPlanForUser(user: any, amountUsd: number) {
@@ -131,7 +169,24 @@ async function startServer() {
   }
 
   const processMining = (user: any) => {
-    if (user.is_suspended || !user.active_plan) {
+    if (user.is_suspended) {
+      return;
+    }
+
+    // Auto-detect and align active_plan based on locked_capital or deposit_usd_value if present
+    const capitalDetect = Number(user.locked_capital || user.deposit_usd_value || 0);
+    if (capitalDetect >= 50000 && user.active_plan !== 'plan_vip') {
+      console.log(`[Mining Payout Engine] Auto-aligning user ${user.email} (${user.id}) to VIP plan based on locked capital of $${capitalDetect}`);
+      activateDynamicPlanForUser(user, capitalDetect);
+    } else if (capitalDetect >= 10000 && capitalDetect < 50000 && user.active_plan !== 'plan_pro') {
+      console.log(`[Mining Payout Engine] Auto-aligning user ${user.email} (${user.id}) to Pro plan based on locked capital of $${capitalDetect}`);
+      activateDynamicPlanForUser(user, capitalDetect);
+    } else if (capitalDetect >= 500 && capitalDetect < 10000 && !user.active_plan) {
+      console.log(`[Mining Payout Engine] Auto-aligning user ${user.email} (${user.id}) to Starter plan based on locked capital of $${capitalDetect}`);
+      activateDynamicPlanForUser(user, capitalDetect);
+    }
+
+    if (!user.active_plan) {
       return;
     }
 
@@ -196,8 +251,18 @@ async function startServer() {
 
       const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
 
-      if (earned > 0.00000001) {
+      console.log(`[Mining Engine Cycle] Processing payouts:`);
+      console.log(` - User ID & Email: ${user.id} (${user.email})`);
+      console.log(` - Active Plan: ${user.active_plan} (${planName})`);
+      console.log(` - Locked Capital: $${usdAmount} USD (Field sources: locked_capital=${user.locked_capital || 'null'}, deposit_usd_value=${user.deposit_usd_value || 'null'}, active_plan_investment=${user.active_plan_investment || 'null'})`);
+      console.log(` - BTC Price: $${btcPriceToUse}`);
+      console.log(` - Calculated profit per minute: ${btcProfitPerMinute.toFixed(10)} BTC`);
+      console.log(` - Elapsed milliseconds: ${elapsedMs} ms (${elapsedMinutes.toFixed(4)} minutes)`);
+      console.log(` - Calculated earnings this cycle: ${earned.toFixed(10)} BTC`);
+
+      if (earned >= 0.00000001) {
         user.btc_balance = Number((user.btc_balance + earned).toFixed(8));
+        console.log(` -> SUCCESS: Credited ${earned.toFixed(8)} BTC to user balance. New Balance: ${user.btc_balance} BTC`);
 
         db.addTransaction({
           id: 'tx_pay_' + Math.random().toString(36).substr(2, 9),
@@ -216,9 +281,13 @@ async function startServer() {
           is_read: false,
           created_at: new Date(activeEnd).toISOString()
         });
-      }
 
-      user.last_mining_at = new Date(activeEnd).toISOString();
+        // ONLY shift last_mining_at forward when an actual payout is credited!
+        // This preserves the elapsed fractions of minutes/seconds across successive fast API polls!
+        user.last_mining_at = new Date(activeEnd).toISOString();
+      } else {
+        console.log(` -> HOLD: Earning of ${earned.toFixed(12)} BTC is below the 1 satoshi minimum (0.00000001 BTC). Holding last_mining_at to accumulate on next cycle.`);
+      }
     }
 
     // Turn off plan if we reached raw expiration
