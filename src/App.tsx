@@ -313,7 +313,7 @@ export default function App() {
     if (resetResendTimer > 0) return;
     try {
       await api.forgotPassword(resetEmail);
-      setResetResendTimer(30);
+      setResetResendTimer(300);
       triggerToast('A new password recovery OTP verification code has been dispatched!', 'success');
     } catch (err: any) {
       triggerToast(err.message || 'Error occurred resending OTP code.', 'error');
@@ -1418,7 +1418,7 @@ export default function App() {
                           setResetEmail(emailInput);
                           setResetCodeInput('');
                           setResetStep('verify');
-                          setResetResendTimer(30); // Start Resend countdown immediately
+                          setResetResendTimer(300); // Start Resend countdown immediately
                           triggerToast('Password reset validation code successfully generated!', 'success');
                         } catch (err: any) {
                           triggerToast(err.message || 'Error occurred starting reset process.', 'error');
@@ -1553,7 +1553,7 @@ export default function App() {
                               : 'text-[#F97316] hover:text-[#EA580C] hover:bg-orange-50 cursor-pointer'
                           }`}
                         >
-                          <span>{resetResendTimer > 0 ? `Resend code in ${resetResendTimer}s` : 'Resend Code'}</span>
+                          <span>{resetResendTimer > 0 ? `Resend code in ${Math.floor(resetResendTimer / 60)}m ${resetResendTimer % 60}s` : 'Resend Code'}</span>
                         </button>
                       </div>
 

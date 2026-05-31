@@ -940,12 +940,22 @@ async function startServer() {
       return res.status(403).json({ error: 'Your account is suspended. Please contact customer services.' });
     }
 
-    // Cooldown timer (60 seconds) check
+    // Cooldown timer (5 minutes) check
     const lastRequest = lastForgotPasswordRequest.get(emailKey);
     const now = Date.now();
-    if (lastRequest && (now - lastRequest < 60000)) {
-      const remaining = Math.ceil((60000 - (now - lastRequest)) / 1000);
-      return res.status(429).json({ error: `Please wait ${remaining} seconds before requesting another code.` });
+    if (lastRequest && (now - lastRequest < 300000)) {
+      const remainingBytes = 300000 - (now - lastRequest);
+      const remainingSecs = Math.ceil(remainingBytes / 1000);
+      const remainingMins = Math.floor(remainingSecs / 60);
+      const remainingSecsMod = remainingSecs % 60;
+      
+      let waitString = '';
+      if (remainingMins > 0) {
+        waitString = `${remainingMins}m ${remainingSecsMod}s`;
+      } else {
+        waitString = `${remainingSecsMod}s`;
+      }
+      return res.status(429).json({ error: `Please wait ${waitString} before requesting another code.` });
     }
 
     // Set last request timestamp
