@@ -100,7 +100,7 @@ export default function DepositModal({
 }: DepositModalProps) {
   const [step, setStep] = useState<'select' | 'invoice'>('select');
   const [depositAmount, setDepositAmount] = useState<string>('500');
-  const [selectedNetwork, setSelectedNetwork] = useState<'usdtbsc' | 'usdttrc20'>('usdttrc20');
+  const [selectedNetwork, setSelectedNetwork] = useState<'usdtbsc' | 'usdttrc20' | 'eth' | 'btc'>('usdttrc20');
   
   // Invoice states
   const [loading, setLoading] = useState<boolean>(false);
@@ -203,7 +203,7 @@ export default function DepositModal({
     if (!payAddress) return;
     navigator.clipboard.writeText(payAddress);
     setCopied(true);
-    toast('USDT deposit wallet address copied to clipboard!', 'success');
+    toast(`${selectedNetwork === 'eth' ? 'ETH' : selectedNetwork === 'btc' ? 'BTC' : 'USDT'} deposit wallet address copied to clipboard!`, 'success');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -436,9 +436,9 @@ export default function DepositModal({
                   {/* Premium Payment Network Toggles */}
                   <div className="border-t border-[#1F222B] pt-5 text-left">
                     <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-3">
-                      Select USDT Payment Network
+                      Select Payment Network
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <button
                         type="button"
                         onClick={() => setSelectedNetwork('usdtbsc')}
@@ -478,6 +478,55 @@ export default function DepositModal({
                         <span className="absolute -top-2 right-3 bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white font-black text-[8px] tracking-wide uppercase px-2 py-0.5 rounded-full shadow-lg">
                           Recommended
                         </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNetwork('eth')}
+                        className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex items-center gap-3 ${
+                          selectedNetwork === 'eth'
+                            ? 'bg-[#1C1713] border-[#F97316] text-white shadow-[0_0_15px_rgba(249,115,22,0.1)]'
+                            : 'bg-[#12161F] border-[#252A36] text-gray-400 hover:border-neutral-700 hover:bg-[#161B28]'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          selectedNetwork === 'eth' ? 'bg-[#627EEA] text-white' : 'bg-neutral-800 text-neutral-400'
+                        }`}>
+                          <svg className="w-4.5 h-4.5" viewBox="0 0 784 1277" fill="currentColor">
+                            <path d="M392 0L383 30v825l9 10 392-232z" opacity="0.6"/>
+                            <path d="M392 0L0 833l392 232V833z"/>
+                            <path d="M392 929l-5 6v307l5 15 392-551z" opacity="0.6"/>
+                            <path d="M392 1257v-328L0 673z"/>
+                            <path d="M392 833l392-232-392-176z" opacity="0.2"/>
+                            <path d="M0 601l392 232V425z" opacity="0.4"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="block text-xs font-bold text-white leading-none">ETH</span>
+                          <span className="block text-[9px] text-gray-400 mt-1">Ethereum ERC20</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNetwork('btc')}
+                        className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex items-center gap-3 ${
+                          selectedNetwork === 'btc'
+                            ? 'bg-[#1C1713] border-[#F97316] text-white shadow-[0_0_15px_rgba(249,115,22,0.1)]'
+                            : 'bg-[#12161F] border-[#252A36] text-gray-400 hover:border-neutral-700 hover:bg-[#161B28]'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          selectedNetwork === 'btc' ? 'bg-[#F7931A] text-white' : 'bg-neutral-800 text-neutral-400'
+                        }`}>
+                          <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.6 14.2c-.5-2.5-2.1-4-4.8-4.7c1.7-.8 2.8-2.1 2.4-4.6c-.5-3.3-3.1-4.7-6.9-3.9l.8-3l-1.8-.4l-.8 3.1c-.5-.1-1-.2-1.5-.3l.8-3.1l-1.8-.4l-.8 3.1c-.4-.1-.9-.1-1.3-.2l.8-3.3l-1.8-.5l-.8 3.2c-.4-.1-.8-.2-1.2-.2l-2.5-.6l-.5 1.9s1.3.3 1.3.3c.7.2.9.6.9 1l-1.9 7.6c-.1.2-.3.5-.7.4c0 0-1.3-.3-1.3-.3l-.9 2l2.3.6c.4.1.9.2 1.3.3l-.8 3.4l1.8.4l.8-3.2c.5.1 1 .2 1.5.3l-.8 3.2l1.8.4l.8-3.2c.4.1.8.1 1.2.2l.8-3.2c3.4.6 6 1.1 6.5-1.8c.4-2.3-1.2-3.4-3.1-4c1.1-.3 1.9-1.2 2-2.7zm-8.8-6.1c1.2.3 2 .8 1.8 2.2c-.2 1.5-1.5 1.7-2.6 1.4L13 11.6l1.8-4.5zM12.3 17.1l-1.9.5l1-4.1l1.9-.5c1.2-.3 2 .3 1.8 1.7c-.2 1.5-1.6 2.4-2.8 2.4z"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="block text-xs font-bold text-white leading-none">BTC</span>
+                          <span className="block text-[9px] text-gray-400 mt-1">Bitcoin Network</span>
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -582,11 +631,11 @@ export default function DepositModal({
                     </div>
                     
                     <div className="text-center">
-                      <p className="text-xs text-gray-400 font-medium">Transmit exactly this USDT amount below</p>
+                      <p className="text-xs text-gray-400 font-medium">Transmit exactly this {selectedNetwork === 'eth' ? 'ETH equivalent' : selectedNetwork === 'btc' ? 'BTC equivalent' : 'USDT amount'} below</p>
                       <h2 className="text-2xl font-extrabold text-[#F97316] font-mono tracking-tight mt-1 animate-pulse flex items-center justify-center">
                         ${amountUsdt.toLocaleString()}
                         <span className="text-[10px] text-white font-semibold bg-neutral-800 border border-[#252A36] px-2 py-0.5 rounded-md ml-1.5 uppercase font-sans">
-                          USDT
+                          {selectedNetwork === 'eth' ? 'ETH VALUE' : selectedNetwork === 'btc' ? 'BTC VALUE' : 'USDT'}
                         </span>
                       </h2>
                     </div>
@@ -595,7 +644,7 @@ export default function DepositModal({
                   {/* Destination Wallet Address display */}
                   <div className="space-y-1.5 text-left">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                      Dedicated USDT Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : 'BSC BEP20'})
+                      Dedicated Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : selectedNetwork === 'eth' ? 'Ethereum ERC20' : selectedNetwork === 'btc' ? 'Bitcoin' : 'BSC BEP20'})
                     </label>
                     <div className="flex border border-[#252A36] rounded-xl overflow-hidden focus-within:border-[#F97316] bg-[#12161F]">
                       <input

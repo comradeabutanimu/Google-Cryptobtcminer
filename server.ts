@@ -1614,20 +1614,24 @@ async function startServer() {
 
         // If GET doesn't return address, fall back to POST /v1/payment to create the address
         if (!address) {
+          const paymentPayload: any = {
+            price_amount: usdAmount,
+            price_currency: 'usd',
+            pay_currency: currency,
+            order_id: invoiceId,
+            order_description: `Purchase of Node`
+          };
+          if (currency !== 'eth' && currency !== 'btc') {
+            paymentPayload.pay_amount = usdAmount;
+          }
+
           const postRes = await fetch(`${nowPayBaseUrl}/payment`, {
             method: 'POST',
             headers: {
               'x-api-key': nowPayApiKey,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              price_amount: usdAmount,
-              price_currency: 'usd',
-              pay_amount: usdAmount,
-              pay_currency: currency,
-              order_id: invoiceId,
-              order_description: `Purchase of Node`
-            })
+            body: JSON.stringify(paymentPayload)
           });
 
           if (postRes.ok) {
@@ -1647,7 +1651,9 @@ async function startServer() {
       if (isSandboxEnv || !nowPayApiKey || nowPayApiKey === 'MY_NOWPAYMENTS_API_KEY' || nowPayApiKey.length <= 5) {
         const mockUsdtBsc = '0x' + Math.random().toString(36).substr(2, 10).toUpperCase() + Math.random().toString(16).substr(2, 10).toLowerCase();
         const mockUsdtTrc20 = 'T' + Math.random().toString(36).substr(2, 9).toUpperCase() + Math.random().toString(16).substr(2, 9).toUpperCase();
-        address = currency === 'usdtbsc' ? mockUsdtBsc : mockUsdtTrc20;
+        const mockEth = '0x' + Math.random().toString(36).substr(2, 10).toUpperCase() + Math.random().toString(16).substr(2, 10).toLowerCase();
+        const mockBtc = 'bc1' + Math.random().toString(36).substr(2, 12).toLowerCase() + Math.random().toString(16).substr(2, 12).toLowerCase();
+        address = currency === 'usdtbsc' ? mockUsdtBsc : currency === 'eth' ? mockEth : currency === 'btc' ? mockBtc : mockUsdtTrc20;
       } else {
         return res.status(400).json({ error: 'Unable to retrieve wallet address. Please try again.' });
       }
