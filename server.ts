@@ -1654,11 +1654,23 @@ async function startServer() {
 
     db.addDeposit(deposit);
 
+    // Regardless of how the deposit is confirmed, start mining as soon as USDT / capital is locked
+    activateDynamicPlanForUser(user, Math.round(usdEquivalent));
+    db.updateProfile(user);
+
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Deposit Initiated',
-      details: `Initiated deposit invoice ${invoiceId} for ${priceBtc} BTC (${plan ? plan.name : 'Custom'} Plan)`,
+      details: `Initiated deposit invoice ${invoiceId} for ${priceBtc} BTC (${plan ? plan.name : 'Custom'} Plan). Cloud mining started instantly.`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_mining_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Your contract has been initiated! Cloud mining has started instantly with $${Math.round(usdEquivalent)} USDT locked.`,
+      is_read: false,
       created_at: new Date().toISOString()
     });
 
@@ -1834,11 +1846,23 @@ async function startServer() {
 
     db.addDeposit(deposit);
 
+    // Regardless of how the deposit is confirmed, start mining as soon as USDT / capital is locked
+    activateDynamicPlanForUser(user, usdAmount);
+    db.updateProfile(user);
+
     db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Deposit Initiated',
-      details: `Initiated deposit invoice ${invoiceId} for ${usdAmount} USDT via ${currency.toUpperCase()}`,
+      details: `Initiated deposit invoice ${invoiceId} for ${usdAmount} USDT via ${currency.toUpperCase()}. Cloud mining started instantly.`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_mining_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Your contract has been initiated! Cloud mining has started instantly with $${usdAmount} USDT locked.`,
+      is_read: false,
       created_at: new Date().toISOString()
     });
 
