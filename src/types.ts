@@ -8,6 +8,7 @@ export interface Profile {
   email: string;
   full_name: string;
   btc_balance: number;
+  usd_balance?: number; // Unlocked USD balance available for swapping or withdrawing
   active_plan: string | null;
   active_plan_investment?: number;
   active_plan_hash_rate?: number;
@@ -75,6 +76,8 @@ export interface Withdrawal {
   id: string;
   user_id: string;
   amount_btc: number;
+  amount_usd?: number;
+  currency?: 'BTC' | 'USDT';
   wallet_address: string;
   status: 'pending' | 'approved' | 'rejected';
   actioned_by: string | null;

@@ -87,6 +87,8 @@ export const api = {
   getDepositStatus: (invoiceId: string) => request<any>(`/api/deposit/status/${invoiceId}`),
   sandboxTriggerConfirm: (invoiceId: string) => request<any>('/api/deposit/sandbox-trigger-confirm', { method: 'POST', body: JSON.stringify({ invoiceId }) }),
   createWithdrawal: (body: any) => request<any>('/api/withdraw', { method: 'POST', body: JSON.stringify(body) }),
+  swapUsdToBtc: (amountUsd: number) => request<any>('/api/user/swap/usd-to-btc', { method: 'POST', body: JSON.stringify({ amountUsd }) }),
+  createUsdtWithdrawal: (body: { amountUsd: number; walletAddress: string }) => request<any>('/api/withdraw/usdt', { method: 'POST', body: JSON.stringify(body) }),
   activatePlan: (planId: string) => request<any>('/api/user/plan/activate', { method: 'POST', body: JSON.stringify({ planId }) }),
 
   // Plans public access 

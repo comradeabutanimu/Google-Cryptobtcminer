@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Eye, EyeOff, Coins, Zap, Trophy, TrendingUp, ArrowUpRight, 
-  ChevronRight, Volume2, ShieldAlert, Cpu 
+  ChevronRight, Volume2, ShieldAlert, Cpu, ArrowRightLeft, Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Profile, Transaction, Announcement, CoingeckoPrice, Plan } from '../types.js';
+import { api } from '../lib/api.js';
 
 interface OverviewProps {
   profile: Profile;
@@ -19,6 +20,7 @@ interface OverviewProps {
   plans?: Plan[];
   onUpdateBlur: (blur: boolean) => void;
   onNavigate: (tab: string) => void;
+  onRefreshDashboard?: () => void;
 }
 
 export default function Overview({ 
@@ -28,10 +30,24 @@ export default function Overview({
   btcPrice, 
   plans,
   onUpdateBlur,
-  onNavigate
+  onNavigate,
+  onRefreshDashboard
 }: OverviewProps) {
   const [blur, setBlur] = useState(profile.settings.blurBalances);
   const [liveBtc, setLiveBtc] = useState(profile.btc_balance);
+
+  // Unlocked capital swap and withdraw states
+  const [openSwapModal, setOpenSwapModal] = useState(false);
+  const [openWithdrawUsdtModal, setOpenWithdrawUsdtModal] = useState(false);
+  const [swapAmount, setSwapAmount] = useState('');
+  const [withdrawUsdtAmount, setWithdrawUsdtAmount] = useState('');
+  const [withdrawUsdtAddress, setWithdrawUsdtAddress] = useState('');
+  const [swapError, setSwapError] = useState('');
+  const [withdrawUsdtError, setWithdrawUsdtError] = useState('');
+  const [swapSuccess, setSwapSuccess] = useState('');
+  const [withdrawUsdtSuccess, setWithdrawUsdtSuccess] = useState('');
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Sync settings blur value
   useEffect(() => {
@@ -138,6 +154,73 @@ export default function Overview({
   // Calculate progress percentage relative to dynamic maximum
   const maxCapacity = Math.max(15.0, hashPowerInTh);
   const progressPercentage = Math.min((hashPowerInTh / maxCapacity) * 100, 100);
+
+  const handleSwapSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSwapError('');
+    setSwapSuccess('');
+    const amt = parseFloat(swapAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setSwapError('Please enter a valid amount.');
+      return;
+    }
+    if (amt > (profile.usd_balance || 0)) {
+      setSwapError('The amount exceeds your unlocked USD balance.');
+      return;
+    }
+
+    setIsSwapping(true);
+    try {
+      await api.swapUsdToBtc(amt);
+      setSwapSuccess(`Successfully swapped $${amt.toFixed(2)} USD value to Bitcoin!`);
+      setSwapAmount('');
+      if (onRefreshDashboard) {
+        onRefreshDashboard();
+      }
+    } catch (err: any) {
+      setSwapError(err.message || 'Failed to process swap. Please try again.');
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
+  const handleWithdrawUsdtSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWithdrawUsdtError('');
+    setWithdrawUsdtSuccess('');
+    const amt = parseFloat(withdrawUsdtAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setWithdrawUsdtError('Please enter a valid amount.');
+      return;
+    }
+    if (amt > (profile.usd_balance || 0)) {
+      setWithdrawUsdtError('The amount exceeds your unlocked USD balance.');
+      return;
+    }
+    if (amt < 10) {
+      setWithdrawUsdtError('Minimum USDT withdrawal amount is $10 USDT.');
+      return;
+    }
+    if (!withdrawUsdtAddress || withdrawUsdtAddress.trim().length < 10) {
+      setWithdrawUsdtError('Please enter a valid USDT destination address.');
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      await api.createUsdtWithdrawal({ amountUsd: amt, walletAddress: withdrawUsdtAddress });
+      setWithdrawUsdtSuccess(`Withdrawal of $${amt.toFixed(2)} USDT filed successfully and is pending administrator review.`);
+      setWithdrawUsdtAmount('');
+      setWithdrawUsdtAddress('');
+      if (onRefreshDashboard) {
+        onRefreshDashboard();
+      }
+    } catch (err: any) {
+      setWithdrawUsdtError(err.message || 'Failed to process withdrawal. Please try again.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
 
   // Resolve daily earning rate
   let dailyEarningRate = 0;
@@ -312,15 +395,15 @@ export default function Overview({
           </div>
         </div>
 
-        {/* Card 2: Locked Balance */}
+        {/* Card 2: Deposit Capital (Locked/Unlocked) */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-gray-500 text-sm font-medium">Locked Balance</span>
+            <span className="text-gray-500 text-sm font-medium">Locked Principal</span>
             <div className="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center">
               <Coins className="h-4 w-4 text-orange-500" />
             </div>
           </div>
-          <div className="mt-4 flex flex-col justify-end">
+          <div className="mt-4 flex flex-col justify-end text-left">
             <motion.h3 
               animate={{ 
                 textShadow: ["0 0 0px rgba(249,115,22,0)", "0 0 6px rgba(249,115,22,0.3)", "0 0 0px rgba(249,115,22,0)"]
@@ -338,6 +421,40 @@ export default function Overview({
             <p className={`text-xs mt-1 font-semibold transition-all duration-300 ${isLocked ? 'text-orange-600' : 'text-gray-400'} ${blur ? 'select-none filter blur-md' : ''}`}>
               {countdownText}
             </p>
+
+            {/* Unlocked Balances & Swaps */}
+            <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-gray-500 font-medium">Unlocked Balance</span>
+                <span className={`text-[13px] font-bold font-mono text-emerald-600 ${blur ? 'select-none filter blur-md' : ''}`}>
+                  ${(profile.usd_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <button 
+                  onClick={() => {
+                    setSwapError('');
+                    setSwapSuccess('');
+                    setOpenSwapModal(true);
+                  }}
+                  disabled={(profile.usd_balance || 0) <= 0}
+                  className="flex-1 text-[10px] py-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold rounded-lg transition disabled:opacity-50 disabled:hover:bg-orange-500 cursor-pointer text-center"
+                >
+                  Swap to BTC
+                </button>
+                <button 
+                  onClick={() => {
+                    setWithdrawUsdtError('');
+                    setWithdrawUsdtSuccess('');
+                    setOpenWithdrawUsdtModal(true);
+                  }}
+                  disabled={(profile.usd_balance || 0) <= 0}
+                  className="flex-1 text-[10px] py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-lg transition disabled:opacity-50 disabled:hover:bg-neutral-100 cursor-pointer text-center"
+                >
+                  Withdraw USDT
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -706,6 +823,196 @@ export default function Overview({
         </div>
 
       </div>
+
+      {/* Swap Modal */}
+      {openSwapModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full border border-gray-100 shadow-xl overflow-hidden relative text-left">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ArrowRightLeft className="text-orange-500 h-5 w-5" />
+              Swap USD to Bitcoin balance
+            </h3>
+            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+              Convert your unlocked principal USD value back into Bitcoin immediately using the index market rate.
+            </p>
+
+            <form onSubmit={handleSwapSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Unlocked USDT Balance available:
+                </label>
+                <div className="px-4 py-3 bg-neutral-50 rounded-xl font-mono text-sm font-bold text-gray-800">
+                  ${(profile.usd_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Amount USDT to Swap:
+                </label>
+                <div className="relative">
+                  <input 
+                    type="number"
+                    step="any"
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    placeholder="e.g. 500"
+                    disabled={isSwapping}
+                    className="w-full pl-4 pr-16 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono text-sm text-gray-800"
+                    required
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setSwapAmount(String(profile.usd_balance || 0))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded cursor-pointer"
+                  >
+                    MAX
+                  </button>
+                </div>
+                {swapAmount && !isNaN(parseFloat(swapAmount)) && (
+                  <p className="text-[10px] text-gray-400 mt-1 font-mono">
+                    You will receive approx. {((parseFloat(swapAmount)) / (btcPrice?.btc_usd || 68420)).toFixed(8)} BTC
+                  </p>
+                )}
+              </div>
+
+              {swapError && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">
+                  {swapError}
+                </div>
+              )}
+
+              {swapSuccess && (
+                <div className="p-3 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-100">
+                  {swapSuccess}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 mt-6 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setOpenSwapModal(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-xl transition cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSwapping || !swapAmount}
+                  className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isSwapping ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Swapping...
+                    </>
+                  ) : 'Confirm Swap'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Withdraw USDT Modal */}
+      {openWithdrawUsdtModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full border border-gray-100 shadow-xl overflow-hidden relative text-left">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Coins className="text-orange-500 h-5 w-5" />
+              Withdraw unlocked USDT
+            </h3>
+            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+              Submit a secure payout request for your unlocked principal USDT capital directly to your web3 address.
+            </p>
+
+            <form onSubmit={handleWithdrawUsdtSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Unlocked USDT Balance available:
+                </label>
+                <div className="px-4 py-3 bg-neutral-50 rounded-xl font-mono text-sm font-bold text-gray-800">
+                  ${(profile.usd_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Amount USDT to Withdraw:
+                </label>
+                <div className="relative">
+                  <input 
+                    type="number"
+                    step="any"
+                    value={withdrawUsdtAmount}
+                    onChange={(e) => setWithdrawUsdtAmount(e.target.value)}
+                    placeholder="Min $10 USDT"
+                    disabled={isWithdrawing}
+                    className="w-full pl-4 pr-16 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono text-sm text-gray-800"
+                    required
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setWithdrawUsdtAmount(String(profile.usd_balance || 0))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded cursor-pointer"
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  TRC-20 / ERC-20 Wallet Address:
+                </label>
+                <input 
+                  type="text"
+                  value={withdrawUsdtAddress}
+                  onChange={(e) => setWithdrawUsdtAddress(e.target.value)}
+                  placeholder="Enter secure Tether receiving address"
+                  disabled={isWithdrawing}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono text-xs text-gray-800"
+                  required
+                />
+              </div>
+
+              {withdrawUsdtError && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">
+                  {withdrawUsdtError}
+                </div>
+              )}
+
+              {withdrawUsdtSuccess && (
+                <div className="p-3 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-100">
+                  {withdrawUsdtSuccess}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 mt-6 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setOpenWithdrawUsdtModal(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-xl transition cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isWithdrawing || !withdrawUsdtAmount || !withdrawUsdtAddress}
+                  className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isWithdrawing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Withdrawing...
+                    </>
+                  ) : 'Confirm Withdrawal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

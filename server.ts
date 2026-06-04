@@ -166,6 +166,8 @@ async function startServer() {
     user.plan_activated_at = new Date().toISOString();
     user.plan_expires_at = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
     user.last_mining_at = new Date().toISOString();
+    user.locked_capital = amountUsd;
+    user.deposit_usd_value = amountUsd;
   }
 
   function creditReferralCommission(depositorId: string, amountUsd: number, amountBtc = 0) {
@@ -267,8 +269,18 @@ async function startServer() {
       }
     }
 
-    // Daily percentage is 5% (0.05) on deposited amount for all plans as requested by background payout rules
-    const dailyReturnRate = 0.05;
+    // Use the actual plan rate (VIP=5%, Pro=3%, Starter=1.5%)
+    let dailyReturnRate = 0.015;
+    if (user.active_plan === 'plan_vip') {
+      dailyReturnRate = 0.05;
+    } else if (user.active_plan === 'plan_pro') {
+      dailyReturnRate = 0.03;
+    } else if (user.active_plan === 'plan_starter') {
+      dailyReturnRate = 0.015;
+    } else if (user.active_plan_rate) {
+      dailyReturnRate = user.active_plan_rate;
+    }
+
     const dailyUsdProfit = usdAmount * dailyReturnRate;
 
     // Convert daily profit percentage to per-minute rate (divide by 1440 minutes in a day)
@@ -297,7 +309,15 @@ async function startServer() {
 
     if (lastTime >= expiryTime) {
       // Plan has expired already
+      const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
       user.active_plan = null;
+      const lockedVal = Number(user.locked_capital || user.deposit_usd_value || 0);
+      if (lockedVal > 0) {
+        user.usd_balance = Number(((user.usd_balance || 0) + lockedVal).toFixed(2));
+        user.locked_capital = 0;
+        user.deposit_usd_value = 0;
+        console.log(`[Mining Payout Engine] Unlocked $${lockedVal} USD during pre-expiration check.`);
+      }
       db.updateProfile(user);
       return;
     }
@@ -353,9 +373,17 @@ async function startServer() {
 
     // Turn off plan if we reached raw expiration
     if (now >= expiryTime) {
-      user.active_plan = null;
       const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
       const durationDays = user.active_plan === 'plan_starter' ? 60 : user.active_plan === 'plan_pro' ? 90 : 180;
+      user.active_plan = null;
+
+      const lockedVal = Number(user.locked_capital || user.deposit_usd_value || 0);
+      if (lockedVal > 0) {
+        user.usd_balance = Number(((user.usd_balance || 0) + lockedVal).toFixed(2));
+        user.locked_capital = 0;
+        user.deposit_usd_value = 0;
+        console.log(`[Mining Payout Engine] Unlocked $${lockedVal} USD upon expiration.`);
+      }
 
       db.addNotification({
         id: 'not_exp_' + Math.random().toString(36).substr(2, 9),
@@ -368,7 +396,7 @@ async function startServer() {
       db.addNotification({
         id: 'not_unlock_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
-        message: `Your deposit of ${usdAmount} USDT has unlocked and is now available for withdrawal.`,
+        message: `Your deposit of of $${usdAmount} USDT has unlocked and is now available for withdrawal.`,
         is_read: false,
         created_at: new Date(expiryTime).toISOString()
       });
@@ -377,7 +405,7 @@ async function startServer() {
         id: 'act_exp_' + Math.random().toString(36).substr(2, 9),
         user_id: user.id,
         action: 'Contract Expired',
-        details: `Your cloud mining contract (${planName}) has expired after ${durationDays} days.`,
+        details: `Your cloud mining contract (${planName}) has expired after ${durationDays} days. Principal $${usdAmount} USD unlocked.`,
         created_at: new Date(expiryTime).toISOString()
       });
     }
@@ -1863,11 +1891,7 @@ async function startServer() {
     }
     db.updateDeposit(deposit);
 
-    // Apply BTC credit safely (if any, usdt deposits default btc to 0)
-    const originalBalance = user.btc_balance;
-    user.btc_balance = Number((originalBalance + deposit.amount_btc).toFixed(8));
-    
-    // Confirm and activate dynamic contract node based on USDT investment amount
+    // Confirm and activate dynamic contract node based on USDT investment amount, which locks the capital instantly
     activateDynamicPlanForUser(user, deposit.amount_usd);
     db.updateProfile(user);
 
@@ -2012,6 +2036,126 @@ async function startServer() {
     res.json({ success: true, profile: user });
   });
 
+  // POST /api/user/swap/usd-to-btc
+  app.post('/api/user/swap/usd-to-btc', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { amountUsd } = req.body;
+    const val = Number(amountUsd);
+
+    if (!val || val <= 0) {
+      return res.status(400).json({ error: 'Please specify a valid USD amount to swap.' });
+    }
+
+    const currentUsdBalance = user.usd_balance || 0;
+    if (currentUsdBalance < val) {
+      return res.status(400).json({ error: `Insufficient unlocked USD balance. You only have $${currentUsdBalance.toFixed(2)} USD.` });
+    }
+
+    const btcPrice = cachedBtcPrice || 68420.0;
+    const btcToCredit = Number((val / btcPrice).toFixed(8));
+
+    user.usd_balance = Number((currentUsdBalance - val).toFixed(2));
+    user.btc_balance = Number((user.btc_balance + btcToCredit).toFixed(8));
+    db.updateProfile(user);
+
+    db.addTransaction({
+      id: 'tx_swap_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      type: 'deposit',
+      description: `Swapped $${val.toFixed(2)} USD to BTC (+${btcToCredit} BTC)`,
+      amount_btc: btcToCredit,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'Currency Swap',
+      details: `Swapped $${val.toFixed(2)} USD to ${btcToCredit} BTC at exchange rate $${btcPrice}`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Successfully swapped $${val.toFixed(2)} USD to ${btcToCredit} BTC!`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
+  // POST /api/withdraw/usdt
+  app.post('/api/withdraw/usdt', authenticate, (req, res) => {
+    const user = (req as any).user;
+    const { amountUsd, walletAddress } = req.body;
+    const val = Number(amountUsd);
+
+    if (!val || val <= 0) {
+      return res.status(400).json({ error: 'Please specify a valid USDT withdrawal amount.' });
+    }
+
+    if (!walletAddress || walletAddress.trim().length < 10) {
+      return res.status(400).json({ error: 'Please specify a valid TRC-20 or ERC-20 destination address.' });
+    }
+
+    const currentUsdBalance = user.usd_balance || 0;
+    if (currentUsdBalance < val) {
+      return res.status(400).json({ error: `Insufficient unlocked USD balance. You only have $${currentUsdBalance.toFixed(2)} USD.` });
+    }
+
+    if (val < 10) {
+      return res.status(400).json({ error: 'Minimum USDT withdrawal is $10 USDT.' });
+    }
+
+    user.usd_balance = Number((currentUsdBalance - val).toFixed(2));
+    db.updateProfile(user);
+
+    const withdrawal: Withdrawal = {
+      id: 'wth_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      amount_btc: 0,
+      amount_usd: val,
+      currency: 'USDT',
+      wallet_address: walletAddress.trim(),
+      status: 'pending',
+      actioned_by: null,
+      actioned_at: null,
+      created_at: new Date().toISOString()
+    };
+    db.addWithdrawal(withdrawal);
+
+    db.addTransaction({
+      id: 'tx_wd_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      type: 'withdrawal',
+      description: `USDT Withdrawal request to ${walletAddress.substring(0, 8)}... ($${val} USDT)`,
+      amount_btc: 0,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
+
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      action: 'USDT Withdrawal Request',
+      details: `Requested USDT withdrawal of $${val} to ${walletAddress}`,
+      created_at: new Date().toISOString()
+    });
+
+    db.addNotification({
+      id: 'not_' + Math.random().toString(36).substr(2, 9),
+      user_id: user.id,
+      message: `Your USDT withdrawal of $${val} is pending review.`,
+      is_read: false,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, profile: user });
+  });
+
   // NOWPayments IPN Webhook callback (optional, but awesome support!)
   app.post('/api/payments/webhook', (req, res) => {
     const { payment_status, order_id, pay_address, pay_amount, invoice_id } = req.body;
@@ -2033,7 +2177,6 @@ async function startServer() {
           if (deposit.amount_btc === 0 && deposit.amount_usd > 0) {
             deposit.amount_btc = Number((deposit.amount_usd / (cachedBtcPrice || 68420.0)).toFixed(8));
           }
-          user.btc_balance = Number((user.btc_balance + deposit.amount_btc).toFixed(8));
           
           activateDynamicPlanForUser(user, deposit.amount_usd);
           db.updateProfile(user);
@@ -2420,16 +2563,8 @@ async function startServer() {
     db.updateDeposit(depositIndex);
 
     if (user) {
-      user.btc_balance = Number((user.btc_balance + depositIndex.amount_btc).toFixed(8));
-      
-      const plans = db.getPlans();
-      const pMatch = plans.find(pl => pl.price_btc <= depositIndex.amount_btc && pl.price_btc > 0);
-      if (pMatch) {
-        user.active_plan = pMatch.id;
-        user.plan_activated_at = new Date().toISOString();
-        user.plan_expires_at = new Date(Date.now() + pMatch.duration_days * 24 * 60 * 60 * 1000).toISOString();
-        user.last_mining_at = new Date().toISOString();
-      }
+      // Confirm and activate dynamic contract node based on USDT investment amount, which locks the capital instantly
+      activateDynamicPlanForUser(user, depositIndex.amount_usd);
       db.updateProfile(user);
 
       // Apply referral commission credit

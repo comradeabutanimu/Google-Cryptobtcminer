@@ -171,7 +171,8 @@ export default function App() {
 
   // 2FA Security popup banner alert state
   const [dismissed2FaAlert, setDismissed2FaAlert] = useState<boolean>(() => {
-    return localStorage.getItem('cryptobtc_miner_2fa_alert_dismissed') === 'true';
+    return localStorage.getItem('cryptobtc_miner_2fa_alert_dismissed') === 'true' ||
+           sessionStorage.getItem('cryptobtc_miner_2fa_alert_dismissed_session') === 'true';
   });
 
   // Custom layout states
@@ -1845,7 +1846,18 @@ export default function App() {
                 <>
                   {/* 2FA SECURITY ALERT BANNER (FEATURE 3) */}
                   {!userProfile.two_factor_enabled && !dismissed2FaAlert && (
-                    <div id="2fa-security-alert-banner" className="mb-6 p-5 sm:p-6 bg-rose-50 border border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-left">
+                    <div id="2fa-security-alert-banner" className="relative mb-6 p-5 pr-10 sm:p-6 sm:pr-12 bg-rose-50 border border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-left">
+                      <button
+                        id="close-2fa-alert-button"
+                        onClick={() => {
+                          setDismissed2FaAlert(true);
+                          sessionStorage.setItem('cryptobtc_miner_2fa_alert_dismissed_session', 'true');
+                        }}
+                        className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-rose-100 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                        aria-label="Close alert"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                       <div className="flex items-start space-x-4">
                         <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
                           <ShieldAlert className="h-6 w-6" />
@@ -1900,6 +1912,7 @@ export default function App() {
                           setDashboardTab(tab);
                         }
                       }}
+                      onRefreshDashboard={loadDashboardAssets}
                     />
                   )}
 
