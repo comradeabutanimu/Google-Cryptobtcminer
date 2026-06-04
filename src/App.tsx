@@ -485,10 +485,10 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
     
-    // Refresh dashboard assets every 60s
+    // Refresh and persist dashboard mining assets with the backend every 15 seconds
     const statsInterval = setInterval(() => {
       loadDashboardAssets();
-    }, 60000);
+    }, 15000);
 
     return () => clearInterval(statsInterval);
   }, [isLoggedIn]);

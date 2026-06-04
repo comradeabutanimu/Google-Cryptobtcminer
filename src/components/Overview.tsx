@@ -279,8 +279,8 @@ export default function Overview({
   
   const lockedBtc = isLocked && btcPriceUsd > 0 ? lockedUsd / btcPriceUsd : 0;
   
-  // Available BTC is liveBtc - lockedBtc
-  const availableBtcVal = Math.max(0, liveBtc - lockedBtc);
+  // Available BTC is the live-incrementing mined profit balance (which does not lock capital in BTC terms)
+  const availableBtcVal = liveBtc;
   const availableUsdVal = availableBtcVal * btcPriceUsd;
 
   // Extract recent activities
