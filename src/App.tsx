@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BarChart3, Award, Clock, Download, Upload, Bell, Sliders, 
   Users, Settings as SettingsIcon, LifeBuoy, ShieldAlert, Shield, LogOut,
   Menu, X, Sparkles, MessageSquare, Send, Check, AlertTriangle, ChevronDown,
-  Eye, EyeOff, Smartphone, Lock, Globe, Loader
+  Eye, EyeOff, Smartphone, Lock, Globe, Loader, Sun, Moon
 } from 'lucide-react';
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
@@ -28,6 +28,9 @@ import Referrals from './components/Referrals.tsx';
 import Settings from './components/Settings.tsx';
 import Support from './components/Support.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
+
+// @ts-ignore
+import chatPopSound from './assets/chat-pop.wav';
 
 interface RouteState {
   currentPage: string;
@@ -222,11 +225,47 @@ export default function App() {
   const [alertText, setAlertText] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Floating live chatbot toggles (Tidio)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('cryptobtc_miner_theme');
+    return (saved === 'dark' || saved === 'light') ? saved : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('cryptobtc_miner_theme', theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   const [chatOpen, setChatOpen] = useState(false);
+  const playChatPopSound = () => {
+    try {
+      const audio = new Audio(chatPopSound);
+      audio.volume = 0.55;
+      audio.play().catch(ev => console.log('Audio autoplay blocked or deferred:', ev));
+    } catch (e) {
+      console.warn('Audio play failed:', e);
+    }
+  };
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'bot' | 'user'; text: string; time: string }>>([
     { sender: 'bot', text: 'Hello! Welcome to CryptoBTC Miner instant helper. How can I assist you with your node configuration or deposit today?', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
   const [chatInput, setChatInput] = useState('');
+  const [isChatTyping, setIsChatTyping] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll chat window when new message arrives or bot starts typing
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isChatTyping, chatOpen]);
 
   // Landing page FAQ dropdown state
   const [landingFaqIndex, setLandingFaqIndex] = useState<number | null>(null);
@@ -592,9 +631,11 @@ export default function App() {
 
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg, time: timeStr }]);
     setChatInput('');
+    setIsChatTyping(true);
 
     // Chatbot response selection block
     setTimeout(() => {
+      setIsChatTyping(false);
       let responseText = "I have recorded your request. Our support staff has been alerted and is typing a response. You'll hear back in a few seconds!";
       const lower = userMsg.toLowerCase();
       
@@ -609,7 +650,7 @@ export default function App() {
       }
 
       setChatMessages(prev => [...prev, { sender: 'bot', text: responseText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-    }, 1200);
+    }, 2200);
   };
 
   return (
@@ -643,6 +684,8 @@ export default function App() {
             onLogout={handleSignOut}
             currentLang={currentLang}
             onLanguageChange={handleLanguageChange}
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
           />
 
           {/* ==================== HOME PAGE LAYOUT ==================== */}
@@ -1747,6 +1790,19 @@ export default function App() {
 
               {/* Right side notifications info indicators */}
               <div className="flex items-center space-x-3">
+                {/* Theme Toggle Button */}
+                <button
+                  onClick={handleToggleTheme}
+                  className="p-2 text-gray-400 hover:text-orange-500 hover:bg-gray-50 border border-transparent hover:border-gray-150 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-2xs"
+                  title={theme === 'dark' ? "Switch to light/default mode" : "Switch to dark mode"}
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="h-4.5 w-4.5 text-amber-500" />
+                  ) : (
+                    <Moon className="h-4.5 w-4.5 text-gray-500" />
+                  )}
+                </button>
+
                 {/* Dashboard Manual Language Selector */}
                 <div className="relative flex items-center space-x-1 border border-gray-100 bg-gray-50 rounded-lg px-2 py-1">
                   <Globe className="h-3.5 w-3.5 text-gray-400" />
@@ -2028,7 +2084,13 @@ export default function App() {
         {/* Toggle Tidio bubble button widget */}
         <button
           id="tidio-chat-bubble-toggle"
-          onClick={() => setChatOpen(!chatOpen)}
+          onClick={() => {
+            const nextState = !chatOpen;
+            setChatOpen(nextState);
+            if (nextState) {
+              playChatPopSound();
+            }
+          }}
           className="w-13 h-13 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xl hover:shadow-2xl hover:scale-105 transition-all outline-hidden relative"
           title="Discuss with Tidio chat assistant"
         >
@@ -2075,6 +2137,19 @@ export default function App() {
                   </span>
                 </div>
               ))}
+
+              {isChatTyping && (
+                <div className="max-w-[65%] rounded-2xl p-3 bg-white text-gray-700 self-start border border-gray-100 rounded-tl-none flex items-center space-x-2">
+                  <span className="text-[10px] text-gray-400 font-bold tracking-tight uppercase">Typing</span>
+                  <div className="flex items-center space-x-1 pl-1">
+                    <span className="chat-dot"></span>
+                    <span className="chat-dot"></span>
+                    <span className="chat-dot"></span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
             </div>
 
             {/* Input send bar footer */}

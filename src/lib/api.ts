@@ -115,6 +115,8 @@ export const api = {
     getAnnouncements: () => request<any[]>('/api/admin/announcements'),
     createAnnouncement: (message: string) => request<any>('/api/admin/announcements/create', { method: 'POST', body: JSON.stringify({ message }) }),
     toggleAnnouncement: (id: string, isActive: boolean) => request<any>(`/api/admin/announcements/${id}/toggle`, { method: 'POST', body: JSON.stringify({ is_active: isActive }) }),
-    deleteAnnouncement: (id: string) => request<any>(`/api/admin/announcements/${id}/delete`, { method: 'POST' })
+    deleteAnnouncement: (id: string) => request<any>(`/api/admin/announcements/${id}/delete`, { method: 'POST' }),
+    exportDatabase: () => request<any>('/api/admin/database/export'),
+    importDatabase: (data: any) => request<any>('/api/admin/database/import', { method: 'POST', body: JSON.stringify(data) })
   }
 };

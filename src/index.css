@@ -4,3 +4,214 @@
   --font-sans: "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Inter", sans-serif;
   --font-mono: "Segoe UI Mono", "Roboto Mono", "Courier New", monospace;
 }
+
+@keyframes tidioHeartbeat {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.08);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.08);
+  }
+  70% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#tidio-chat-bubble-toggle {
+  animation: tidioHeartbeat 3s infinite ease-in-out;
+}
+
+#tidio-chat-bubble-toggle:hover {
+  animation-play-state: paused;
+}
+
+@keyframes chatTypingDot {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.chat-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background-color: #f97316; /* orange-500 */
+  border-radius: 50%;
+  animation: chatTypingDot 1.4s infinite ease-in-out;
+}
+
+.chat-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.chat-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chat-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ==================== GLOBAL DARK LAYOUT & TRANSITIONS ==================== */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Fast global buttery smooth background transition for high quality feel */
+body, nav, header, aside, main, div, button {
+  transition: background-color 0.25s ease-in-out, border-color 0.25s ease-in-out;
+}
+
+html.dark body,
+html.dark #root,
+html.dark .min-h-screen,
+html.dark .bg-\[\#FAFAF9\],
+html.dark .bg-gray-50\/50,
+html.dark .bg-gray-50,
+html.dark main {
+  background-color: #0c0a09 !important;
+  color: #e7e5e4 !important;
+}
+
+/* Navbars, Headers, Footers, Sidebars and Cards */
+html.dark nav,
+html.dark header,
+html.dark footer,
+html.dark aside,
+html.dark .bg-white,
+html.dark .bg-stone-50,
+html.dark .bg-stone-50\/20,
+html.dark .bg-orange-50\/50 {
+  background-color: #171513 !important;
+}
+
+/* Borders across elements */
+html.dark .border-gray-100,
+html.dark .border-gray-150,
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-\[\#E7E7E4\],
+html.dark .border-stone-200,
+html.dark .border-stone-150,
+html.dark .border-stone-100,
+html.dark div[class*="border"] {
+  border-color: #2e2a27 !important;
+}
+
+/* Text selections & colors */
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6,
+html.dark .text-gray-950,
+html.dark .text-gray-900,
+html.dark .text-[#111827],
+html.dark .text-[#1D1B18],
+html.dark .text-[#1a1a1a],
+html.dark .text-[#1A1A1A],
+html.dark .text-neutral-900 {
+  color: #fafaf9 !important;
+}
+
+html.dark p,
+html.dark .text-gray-750,
+html.dark .text-gray-700,
+html.dark .text-gray-650,
+html.dark .text-[#4B5563],
+html.dark .text-gray-600 {
+  color: #d6d3d1 !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: #a8a29e !important;
+}
+
+/* Forms & Interactive Fields */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #12100e !important;
+  color: #fafaf9 !important;
+  border-color: #3f3a36 !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #f97316 !important;
+  --tw-ring-color: rgba(249, 115, 22, 0.2);
+}
+
+html.dark input::placeholder {
+  color: #78716c !important;
+}
+
+/* Overwrite background gradients perfectly to dark-stone variants */
+html.dark .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #171513, #0c0a09) !important;
+}
+
+html.dark .from-\[\#FAFAF9\], html.dark .from-orange-50 {
+  --tw-gradient-from: #1c1917 !important;
+  --tw-gradient-to: #0c0a09 !important;
+}
+
+html.dark .to-\[\#FEE2E2\], html.dark .to-orange-100 {
+  --tw-gradient-to: #2c1a15 !important; /* Elegant subtle deep glowing amber/red shadow */
+}
+
+/* Modals & Backdrop Overlays */
+html.dark .bg-black\/50,
+html.dark .bg-neutral-900\/60,
+html.dark .fixed.inset-0 {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Hover background states */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-orange-50\/50:hover,
+html.dark .hover\:bg-stone-50:hover {
+  background-color: #292524 !important;
+}
+
+/* Maintain crisp text indicators inside dark mode buttons */
+html.dark button.text-white,
+html.dark .text-white,
+html.dark .bg-orange-500 *,
+html.dark .bg-emerald-500 * {
+  color: #ffffff !important;
+}
+
+/* Custom UI cards highlighting */
+html.dark .bg-[#FDFDFC] {
+  background-color: #171513 !important;
+}
+
+/* Support and chat interface refinements */
+html.dark #tidio-chat-bubble-toggle {
+  background-color: #f97316 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .react-markdown, html.dark .markdown-body {
+  color: #d6d3d1 !important;
+}
+

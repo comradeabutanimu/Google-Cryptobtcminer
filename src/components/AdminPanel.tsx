@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Download, Upload, Cpu, Volume2, Shield, Search, 
   Check, X, Ban, Eye, Settings, Plus, Trash, ShieldCheck, 
-  Terminal, Sliders, Briefcase, FileText 
+  Terminal, Sliders, Briefcase, FileText, Database, ShieldAlert
 } from 'lucide-react';
 import { Profile, Plan, Transaction, Deposit, Withdrawal, Announcement } from '../types.js';
 import { api } from '../lib/api.js';
@@ -17,8 +17,12 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ toast }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'withdrawals' | 'deposits' | 'plans' | 'announcements'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'withdrawals' | 'deposits' | 'plans' | 'announcements' | 'database'>('users');
   const [loading, setLoading] = useState(false);
+
+  // Database Tab state
+  const [dbImporting, setDbImporting] = useState(false);
+  const [dbExporting, setDbExporting] = useState(false);
 
   // Users Tab state
   const [users, setUsers] = useState<Profile[]>([]);
@@ -88,6 +92,8 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
       } else if (activeTab === 'announcements') {
         const res = await api.admin.getAnnouncements();
         setAnnouncements(res);
+      } else if (activeTab === 'database') {
+        // No data fetching required for stats/config layout
       }
     } catch (err: any) {
       toast(err.message || 'Error syncing dashboard panels.', 'error');
@@ -304,6 +310,61 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
     }
   };
 
+  const handleExportDatabase = async () => {
+    setDbExporting(true);
+    try {
+      const data = await api.admin.exportDatabase();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cryptobtc_database_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast('Database backup JSON exported successfully! Keep this file safe.', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to export database backup.', 'error');
+    } finally {
+      setDbExporting(false);
+    }
+  };
+
+  const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('WARNING: Importing a database backup will merge/overwrite the current active memory state. Are you sure you want to proceed?')) {
+      e.target.value = '';
+      return;
+    }
+
+    setDbImporting(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const text = event.target?.result as string;
+          const parsed = JSON.parse(text);
+          await api.admin.importDatabase(parsed);
+          toast('Database backup JSON successfully imported and synced!', 'success');
+          loadTabContent(); // reload dashboards
+        } catch (err: any) {
+          toast(err.message || 'Invalid JSON format in the backup file.', 'error');
+        } finally {
+          setDbImporting(false);
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    } catch (err: any) {
+      toast(err.message || 'Failed to read backup file.', 'error');
+      setDbImporting(false);
+      e.target.value = '';
+    }
+  };
+
   // Filtering users query locally
   const filteredUsers = users.filter(u => 
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -338,7 +399,8 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
             { id: 'withdrawals', label: 'Withdraws', icon: <Upload className="h-3.5 w-3.5" /> },
             { id: 'deposits', label: 'Deposits', icon: <Download className="h-3.5 w-3.5" /> },
             { id: 'plans', label: 'Contracts', icon: <Cpu className="h-3.5 w-3.5" /> },
-            { id: 'announcements', label: 'News', icon: <Volume2 className="h-3.5 w-3.5" /> }
+            { id: 'announcements', label: 'News', icon: <Volume2 className="h-3.5 w-3.5" /> },
+            { id: 'database', label: 'Database Sync', icon: <Database className="h-3.5 w-3.5" /> }
           ].map(tab => (
             <button
               key={tab.id}
@@ -971,6 +1033,326 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
                   ) : (
                     <div className="text-center py-12 text-gray-400">No active broadcast campaigns logged.</div>
                   )}
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ==================== TABS 6: DATABASE ADMIN SYNC SECTION ==================== */}
+          {activeTab === 'database' && (
+            <div className="space-y-6">
+              
+              {/* Main info banner */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                <div className="flex items-start space-x-3.5">
+                  <span className="p-3 bg-rose-50 rounded-xl mt-1 text-rose-500 shrink-0">
+                    <ShieldAlert className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900">Prevent Deployment Wipes & Manage Persistence</h4>
+                    <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                      This application is deployed as a stateless container. Every time you push a code change, a brand new container is provisioned. 
+                      Since container local storage is completely ephemeral, any active user modifications, profiles, or deposits saved inside the temporary 
+                      <code>/data/db.json</code> file will be replaced by the default repository file upon deploying.
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                      To prevent this permanently, you should configure a cloud-hosted database like <strong>Supabase</strong> by setting up 
+                      <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> in your environment variables. 
+                      If you do not have Supabase configured yet, you can use the secure utility below to download a manual backup and restore it anytime in one click.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hot Action triggers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-50 font-sans">
+                  
+                  {/* Export Panel */}
+                  <div className="p-5 bg-neutral-50 rounded-xl border border-neutral-100 space-y-3.5 flex flex-col justify-between">
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-neutral-800">1. Cold Database Export</h5>
+                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                        Export your live production context (including user balances, accounts, and transaction histories) into a single, secure, human-readable JSON backup file. Keep this file stored privately.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleExportDatabase}
+                      disabled={dbExporting}
+                      className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 font-bold text-white text-xs py-3.5 rounded-xl cursor-pointer text-center flex items-center justify-center space-x-1.5 transition-colors mt-2"
+                    >
+                      <Download className="h-4 w-4 text-orange-500" />
+                      <span>{dbExporting ? 'Generating Export...' : 'Download Database Backup (JSON)'}</span>
+                    </button>
+                  </div>
+
+                  {/* Import Panel */}
+                  <div className="p-5 bg-orange-50/20 rounded-xl border border-orange-100/50 space-y-3.5 flex flex-col justify-between">
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-orange-700">2. Restore Database State</h5>
+                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed font-sans">
+                        Restore or merge your saved JSON database state back into the active environment memory. If Supabase is connected, the system will automatically rebuild and sync all records in the cloud!
+                      </p>
+                    </div>
+
+                    <div className="relative mt-2">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportDatabase}
+                        disabled={dbImporting}
+                        id="db-backup-upload"
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="db-backup-upload"
+                        className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 font-bold text-white text-xs py-3.5 rounded-xl cursor-pointer text-center flex items-center justify-center space-x-1.5 transition-colors shadow-xs hover:shadow-md block"
+                      >
+                        <Upload className="h-4 w-4" />
+                        <span>{dbImporting ? 'Processing Restore...' : 'Restore / Upload Backup (JSON)'}</span>
+                      </label>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Supabase Schema Instructions */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900">Seamless Supabase Cloud Setup</h4>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      To automate synchronization and achieve zero-maintenance durable persistence, run the following SQL statements inside the 
+                      <strong>SQL Editor</strong> page of your Supabase project dashboard.
+                    </p>
+                    <p className="text-xs text-emerald-600 font-semibold mt-1 flex items-center">
+                      <Check className="h-3.5 w-3.5 mr-1 shrink-0" />
+                      Zero Destructive Queries: Safe to deploy alongside existing active tables.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const sqlCode = `-- --- MASTER CRYPTOBTC MINER DATABASE SETUP SCHEMA ---
+-- Run this script inside your Supabase SQL Editor to instantly provision necessary tables.
+-- DO NOT include any DROP TABLE commands to preserve and prevent overwriting existing structures!
+
+-- Create Profile Schema
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  btc_balance DOUBLE PRECISION DEFAULT 0.0,
+  active_plan TEXT,
+  active_plan_investment DOUBLE PRECISION,
+  active_plan_hash_rate DOUBLE PRECISION,
+  active_plan_rate DOUBLE PRECISION,
+  plan_activated_at TEXT,
+  plan_expires_at TEXT,
+  last_mining_at TEXT,
+  is_admin BOOLEAN DEFAULT false,
+  is_suspended BOOLEAN DEFAULT false,
+  referral_code TEXT,
+  referred_by TEXT,
+  admin_note TEXT,
+  settings TEXT, -- JSON structure formatted as string
+  two_factor_enabled BOOLEAN DEFAULT false,
+  two_factor_secret TEXT,
+  known_ips TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create plans table
+CREATE TABLE IF NOT EXISTS plans (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price_btc DOUBLE PRECISION NOT NULL,
+  hash_rate TEXT NOT NULL,
+  daily_earn_btc DOUBLE PRECISION NOT NULL,
+  duration_days INTEGER NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TEXT NOT NULL
+);
+
+-- Create transactions table
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  description TEXT,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Create deposits table
+CREATE TABLE IF NOT EXISTS deposits (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount_usd DOUBLE PRECISION,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  invoice_id TEXT,
+  nowpayments_payment_id TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Create withdrawals table
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  wallet_address TEXT NOT NULL,
+  status TEXT NOT NULL,
+  actioned_by TEXT,
+  actioned_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create activity_logs table
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  action TEXT NOT NULL,
+  details TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  created_at TEXT NOT NULL
+);
+
+-- Create announcements table
+CREATE TABLE IF NOT EXISTS announcements (
+  id TEXT PRIMARY KEY,
+  message TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TEXT NOT NULL
+);`;
+                      navigator.clipboard.writeText(sqlCode);
+                      toast('Supabase SQL migration script copied to clipboard!', 'success');
+                    }}
+                    className="text-[10px] bg-orange-500 hover:bg-orange-600 text-white font-extrabold px-3 py-2 rounded-lg cursor-pointer flex items-center space-x-1 uppercase transition-colors shrink-0"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Copy Setup Script</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100">
+                    <span className="text-xs font-bold text-gray-500 font-mono">SUPABASE_PROVISIONING_SCHEMA.sql</span>
+                  </div>
+
+                  <pre className="p-4.5 bg-neutral-900 text-neutral-300 font-mono text-[10px] rounded-xl overflow-x-auto max-h-96 leading-relaxed border border-neutral-800">
+{`-- --- MASTER CRYPTOBTC MINER DATABASE SETUP SCHEMA ---
+-- Run this script inside your Supabase SQL Editor to instantly provision necessary tables.
+-- DO NOT include any DROP TABLE commands to preserve and prevent overwriting existing structures!
+
+-- Create Profile Schema
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  btc_balance DOUBLE PRECISION DEFAULT 0.0,
+  active_plan TEXT,
+  active_plan_investment DOUBLE PRECISION,
+  active_plan_hash_rate DOUBLE PRECISION,
+  active_plan_rate DOUBLE PRECISION,
+  plan_activated_at TEXT,
+  plan_expires_at TEXT,
+  last_mining_at TEXT,
+  is_admin BOOLEAN DEFAULT false,
+  is_suspended BOOLEAN DEFAULT false,
+  referral_code TEXT,
+  referred_by TEXT,
+  admin_note TEXT,
+  settings TEXT, -- JSON structure formatted as string
+  two_factor_enabled BOOLEAN DEFAULT false,
+  two_factor_secret TEXT,
+  known_ips TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create plans table
+CREATE TABLE IF NOT EXISTS plans (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price_btc DOUBLE PRECISION NOT NULL,
+  hash_rate TEXT NOT NULL,
+  daily_earn_btc DOUBLE PRECISION NOT NULL,
+  duration_days INTEGER NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TEXT NOT NULL
+);
+
+-- Create transactions table
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  description TEXT,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Create deposits table
+CREATE TABLE IF NOT EXISTS deposits (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount_usd DOUBLE PRECISION,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  invoice_id TEXT,
+  nowpayments_payment_id TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Create withdrawals table
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  amount_btc DOUBLE PRECISION NOT NULL,
+  wallet_address TEXT NOT NULL,
+  status TEXT NOT NULL,
+  actioned_by TEXT,
+  actioned_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create activity_logs table
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  action TEXT NOT NULL,
+  details TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  created_at TEXT NOT NULL
+);
+
+-- Create announcements table
+CREATE TABLE IF NOT EXISTS announcements (
+  id TEXT PRIMARY KEY,
+  message TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TEXT NOT NULL
+);`}
+                  </pre>
                 </div>
               </div>
 

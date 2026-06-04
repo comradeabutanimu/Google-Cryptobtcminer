@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Menu, X, Coins, Globe } from 'lucide-react';
+import { Menu, X, Coins, Globe, Sun, Moon } from 'lucide-react';
 import { LANGUAGES, LanguageCode } from '../locales.ts';
 
 interface NavbarProps {
@@ -14,6 +14,8 @@ interface NavbarProps {
   onLogout: () => void;
   currentLang: LanguageCode;
   onLanguageChange: (lang: LanguageCode) => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export default function Navbar({ 
@@ -22,7 +24,9 @@ export default function Navbar({
   isLoggedIn, 
   onLogout,
   currentLang,
-  onLanguageChange
+  onLanguageChange,
+  theme = 'light',
+  onToggleTheme
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -78,6 +82,19 @@ export default function Navbar({
 
           {/* Right Core Action Pill Buttons */}
           <div className="hidden md:flex items-center space-x-[20px]">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={onToggleTheme}
+              className="p-2 text-gray-500 hover:text-[#F97316] hover:bg-gray-50 rounded-xl transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-gray-150 shadow-2xs"
+              title={theme === 'dark' ? "Switch to light/default mode" : "Switch to dark mode"}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-4.5 w-4.5 text-amber-500" />
+              ) : (
+                <Moon className="h-4.5 w-4.5 text-gray-650" />
+              )}
+            </button>
+
             {/* Manual Language Switcher */}
             <div className="relative flex items-center space-x-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
               <Globe className="h-3.5 w-3.5 text-gray-500" />
@@ -128,10 +145,23 @@ export default function Navbar({
           </div>
 
           {/* Mobile responsive toggle */}
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center space-x-2 md:hidden">
+            {/* Mobile Theme Toggle Button */}
+            <button
+              onClick={onToggleTheme}
+              className="p-2 text-gray-500 hover:text-orange-500 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+              title="Toggle Theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5 text-amber-500" />
+              ) : (
+                <Moon className="h-5 w-5 text-gray-600" />
+              )}
+            </button>
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-orange-500 hover:bg-gray-100 focus:outline-hidden"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-650 hover:text-orange-500 hover:bg-gray-100 focus:outline-hidden"
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>

@@ -2558,6 +2558,26 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Admin: Export entire database backup JSON
+  app.get('/api/admin/database/export', adminAuthenticate, (req, res) => {
+    try {
+      const data = db.exportDatabase();
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to export database.' });
+    }
+  });
+
+  // Admin: Import entire database backup JSON
+  app.post('/api/admin/database/import', adminAuthenticate, async (req, res) => {
+    try {
+      await db.importDatabase(req.body);
+      res.json({ success: true, message: 'Database backup imported and synced successfully!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to import database backup.' });
+    }
+  });
+
 
   // --- DAILY AND LIVE SIMULATED CRON MINING ENGINE ---
   // To keep the user experience incredibly fluid, our server performs 

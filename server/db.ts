@@ -173,10 +173,20 @@ class Database {
       if (!pError && profiles) {
         this.availableTables.add('profiles');
         if (profiles.length > 0) {
-          this.data.profiles = profiles.map(p => ({
-            ...p,
-            settings: typeof p.settings === 'string' ? JSON.parse(p.settings) : p.settings
-          }));
+          this.data.profiles = profiles.map(p => {
+            const unified = { ...p };
+            // Auto map lowercased passwordhash or password_hash back to camelCase passwordHash for authentication security checks
+            if (!unified.passwordHash && unified.passwordhash) {
+              unified.passwordHash = unified.passwordhash;
+            }
+            if (!unified.passwordHash && unified.password_hash) {
+              unified.passwordHash = unified.password_hash;
+            }
+            return {
+              ...unified,
+              settings: typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings
+            };
+          });
           console.log(`Loaded ${profiles.length} profiles from Supabase.`);
         } else {
           if (this.data.profiles.length > 0) {
@@ -328,17 +338,30 @@ class Database {
     const cleaned = { ...row };
     // Always strip known non-column helper keys
     delete cleaned.detected_language;
-    delete cleaned.passwordHash;
 
     const columns = this.tableColumns.get(tableName);
     if (!columns || columns.size === 0) {
+      // Preserve passwordHash safely if columns have not been fetched yet
       return cleaned;
     }
 
     const filtered: any = {};
     for (const key of Object.keys(cleaned)) {
-      if (columns.has(key)) {
-        filtered[key] = cleaned[key];
+      const keyLower = key.toLowerCase();
+      // Keep passwordHash key mapped correctly to whichever casing columns exist (e.g., password_hash or passwordhash)
+      if (key === 'passwordHash') {
+        const foundColumn = Array.from(columns).find(
+          c => c.toLowerCase() === 'passwordhash' || c.toLowerCase() === 'password_hash'
+        );
+        if (foundColumn) {
+          filtered[foundColumn] = cleaned[key];
+          continue;
+        }
+      }
+
+      const exactColumnName = Array.from(columns).find(c => c.toLowerCase() === keyLower);
+      if (exactColumnName) {
+        filtered[exactColumnName] = cleaned[key];
       }
     }
     return filtered;
@@ -554,6 +577,42 @@ class Database {
     this.data.announcements = this.data.announcements.filter(a => a.id !== id);
     this.save();
     this.supabaseDelete('announcements', id);
+  }
+
+  public exportDatabase() {
+    return this.data;
+  }
+
+  public async importDatabase(newData: any) {
+    if (!newData || typeof newData !== 'object') {
+      throw new Error('Invalid database backup format.');
+    }
+
+    this.data = {
+      profiles: Array.isArray(newData.profiles) ? newData.profiles : this.data.profiles,
+      plans: Array.isArray(newData.plans) ? newData.plans : this.data.plans,
+      transactions: Array.isArray(newData.transactions) ? newData.transactions : this.data.transactions,
+      deposits: Array.isArray(newData.deposits) ? newData.deposits : this.data.deposits,
+      withdrawals: Array.isArray(newData.withdrawals) ? newData.withdrawals : this.data.withdrawals,
+      activity_logs: Array.isArray(newData.activity_logs) ? newData.activity_logs : this.data.activity_logs,
+      notifications: Array.isArray(newData.notifications) ? newData.notifications : this.data.notifications,
+      announcements: Array.isArray(newData.announcements) ? newData.announcements : this.data.announcements
+    };
+
+    this.save();
+
+    if (this.supabaseClient) {
+      console.log('Initiating bulk restore/upsert to Supabase after manual database backup import...');
+      const tables = ['profiles', 'plans', 'transactions', 'deposits', 'withdrawals', 'activity_logs', 'notifications', 'announcements'];
+      for (const t of tables) {
+        if (this.availableTables.has(t)) {
+          const rowsToSync = (this.data as any)[t === 'activity_logs' ? 'activity_logs' : t];
+          if (rowsToSync && rowsToSync.length > 0) {
+            await this.syncTableToSupabase(t, rowsToSync);
+          }
+        }
+      }
+    }
   }
 }
 
