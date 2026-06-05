@@ -7,7 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Download, Upload, Cpu, Volume2, Shield, Search, 
   Check, X, Ban, Eye, Settings, Plus, Trash, ShieldCheck, 
-  Terminal, Sliders, Briefcase, FileText, Database, ShieldAlert
+  Terminal, Sliders, Briefcase, FileText, Database, ShieldAlert,
+  RefreshCw, FileSpreadsheet
 } from 'lucide-react';
 import { Profile, Plan, Transaction, Deposit, Withdrawal, Announcement } from '../types.js';
 import { api } from '../lib/api.js';
@@ -63,10 +64,84 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [newAnnouncementText, setNewAnnouncementText] = useState('');
 
+  // Permanent Storage & Export tracker states
+  const [lastExportDate, setLastExportDate] = useState<string | null>(() => localStorage.getItem('cryptobtc_last_export_date'));
+  const [lastUserExportDate, setLastUserExportDate] = useState<string | null>(() => localStorage.getItem('cryptobtc_last_user_export_date'));
+  const [supabaseStatus, setSupabaseStatus] = useState<any>(null);
+  const [syncingSupabase, setSyncingSupabase] = useState(false);
+
   // Initial loader
   useEffect(() => {
     loadTabContent();
   }, [activeTab]);
+
+  const handleSyncSupabase = async () => {
+    setSyncingSupabase(true);
+    try {
+      const res = await api.admin.syncSupabase();
+      setSupabaseStatus(res);
+      toast(res.message || 'Supabase setup synchronized and tables scanned successfully!', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to sync with Supabase. Check environment variables.', 'error');
+    } finally {
+      setSyncingSupabase(false);
+    }
+  };
+
+  const handleExportUsersCSV = () => {
+    try {
+      if (!users || users.length === 0) {
+        toast('No users available to export.', 'error');
+        return;
+      }
+      
+      const headers = ['ID', 'Email', 'Full Name', 'BTC Balance', 'Active Plan', 'Plan Expiry', 'Suspended', 'Admin', 'Created At'];
+      const rows = users.map(u => [
+        u.id,
+        u.email,
+        u.full_name || '',
+        u.btc_balance || 0,
+        u.active_plan === 'plan_starter' ? 'Starter' : u.active_plan === 'plan_pro' ? 'Pro' : u.active_plan === 'plan_vip' ? 'VIP' : u.active_plan || 'Inactive',
+        u.plan_expires_at || 'N/A',
+        u.is_suspended ? 'YES' : 'NO',
+        u.is_admin ? 'YES' : 'NO',
+        u.created_at
+      ]);
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+        + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `cryptobtc_user_directory_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      const timestamp = new Date().toLocaleString();
+      localStorage.setItem('cryptobtc_last_user_export_date', timestamp);
+      setLastUserExportDate(timestamp);
+      toast('User directory exported successfully as CSV!', 'success');
+    } catch (e: any) {
+      toast('Failed to export user CSV: ' + e.message, 'error');
+    }
+  };
+
+  const handleExportSingleUser = (u: Profile) => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(u, null, 2));
+      const link = document.createElement('a');
+      link.setAttribute("href", dataStr);
+      link.setAttribute("download", `user_${u.email.replace(/[@.]/g, '_')}_details.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast(`User data for ${u.email} exported successfully!`, 'success');
+    } catch (err: any) {
+      toast('Failed to export user profile data JSON.', 'error');
+    }
+  };
 
   const loadTabContent = async () => {
     setLoading(true);
@@ -93,7 +168,12 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
         const res = await api.admin.getAnnouncements();
         setAnnouncements(res);
       } else if (activeTab === 'database') {
-        // No data fetching required for stats/config layout
+        try {
+          const status = await api.admin.getSupabaseStatus();
+          setSupabaseStatus(status);
+        } catch (e) {
+          console.warn('Failed to load Supabase setup state on tab change.');
+        }
       }
     } catch (err: any) {
       toast(err.message || 'Error syncing dashboard panels.', 'error');
@@ -323,6 +403,9 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      const nowStr = new Date().toLocaleString();
+      localStorage.setItem('cryptobtc_last_export_date', nowStr);
+      setLastExportDate(nowStr);
       toast('Database backup JSON exported successfully! Keep this file safe.', 'success');
     } catch (err: any) {
       toast(err.message || 'Failed to export database backup.', 'error');
@@ -435,21 +518,37 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-6">
               
               {/* Search filter bar */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100/50">
                 <div>
                   <h4 className="text-base font-bold text-gray-900">User accounts & wallets</h4>
-                  <p className="text-xs text-gray-400">Total users registered: {users.length}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Total users registered: <strong className="text-gray-900">{users.length}</strong></p>
+                  {lastUserExportDate && (
+                    <p className="text-[10px] text-gray-400 italic mt-0.5">
+                      Last Directory CSV Export: <span className="font-semibold text-gray-600">{lastUserExportDate}</span>
+                    </p>
+                  )}
                 </div>
                 
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by full name or email..."
-                    className="w-full pl-9 pr-4 py-2 text-xs border border-gray-100 rounded-xl focus:border-orange-500 font-medium"
-                  />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                  <button
+                    onClick={handleExportUsersCSV}
+                    className="cursor-pointer inline-flex items-center justify-center space-x-1 px-3.5 py-2.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-extrabold text-[10px] uppercase rounded-xl transition-all shadow-xs"
+                    title="Export all database users as CSV spreadsheet"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-0.5" />
+                    <span>Export User Directory (CSV)</span>
+                  </button>
+
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search email, name..."
+                      className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:border-orange-500 font-medium placeholder-gray-400 transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -528,6 +627,14 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
 
                           {/* Quick details */}
                           <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => handleExportSingleUser(user)}
+                              className="px-2 py-1 text-[10px] font-extrabold bg-green-50 text-green-700 hover:bg-green-100/10 border border-green-200/50 rounded-lg cursor-pointer inline-flex items-center"
+                              title={`Export Full JSON Context for ${user.email}`}
+                            >
+                              <Download className="h-2.5 w-2.5 mr-0.5 text-green-600" />
+                              Export data
+                            </button>
                             <button
                               onClick={() => handleOpenUserDetail(user)}
                               className="px-2 py-1 text-[10px] font-bold bg-gray-50 text-gray-600 hover:text-gray-900 border border-gray-100 rounded-lg cursor-pointer"
@@ -1074,6 +1181,11 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
                       <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
                         Export your live production context (including user balances, accounts, and transaction histories) into a single, secure, human-readable JSON backup file. Keep this file stored privately.
                       </p>
+                      {lastExportDate && (
+                        <p className="text-[10px] text-gray-400 italic mt-1 font-sans">
+                          Last Export Triggered: <span className="font-semibold text-gray-600">{lastExportDate}</span>
+                        </p>
+                      )}
                     </div>
 
                     <button
@@ -1356,6 +1468,79 @@ CREATE TABLE IF NOT EXISTS announcements (
                 </div>
               </div>
 
+              {/* Dynamic Live Supabase Status Card */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+                      <Database className="h-5 w-5 text-orange-500" />
+                      <span>Live Supabase Integration Monitor</span>
+                    </h4>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Check your active connection status, recognized tables, and trigger a self-healing resync of all repository data.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleSyncSupabase}
+                    disabled={syncingSupabase}
+                    className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs uppercase rounded-xl shadow-xs transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${syncingSupabase ? 'animate-spin' : ''}`} />
+                    <span>{syncingSupabase ? 'Scanning Schema...' : 'Re-verify & Sync Supabase Setup'}</span>
+                  </button>
+                </div>
+
+                {supabaseStatus ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 font-sans overflow-hidden">
+                    {/* Database Config Connection Block */}
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100/80 space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 font-mono block">Status Configuration</span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${supabaseStatus.configured ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        <span className="text-xs font-bold text-gray-800">
+                          {supabaseStatus.configured ? 'SUPABASE_URL Detected' : 'Keys Missing in Environment'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] font-mono text-gray-400 break-all bg-white px-2 py-1 rounded border border-gray-100">
+                        URL: {supabaseStatus.url || 'Not set'}
+                      </p>
+                    </div>
+
+                    {/* Synchronized Tables Checklist */}
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100/80 space-y-2 lg:col-span-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 font-mono block">Active Table Sync Coverage</span>
+                      
+                      <div className="flex flex-wrap gap-2 pt-1 font-mono">
+                        {['profiles', 'plans', 'transactions', 'deposits', 'withdrawals', 'activity_logs', 'notifications', 'announcements'].map(t => {
+                          const isActive = supabaseStatus.availableTables?.includes(t);
+                          return (
+                            <div 
+                              key={t} 
+                              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${
+                                isActive 
+                                  ? 'bg-emerald-50/50 border-emerald-100/80 text-emerald-800' 
+                                  : 'bg-rose-50/50 border-rose-100/50 text-rose-700'
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+                              <span>{t}</span>
+                              <span className="text-[9px] font-normal text-gray-400">
+                                ({isActive ? `${supabaseStatus.discoveredColumns?.[t]?.length || 0} cols` : 'missing'})
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50/30">
+                    <p className="text-xs text-gray-400">Loading Supabase integration context status...</p>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
@@ -1528,7 +1713,15 @@ CREATE TABLE IF NOT EXISTS announcements (
             </div>
 
             {/* Modal bottom exit bar */}
-            <div className="px-6 py-4.5 border-t border-gray-100 text-right bg-gray-50/50">
+            <div className="px-6 py-4.5 border-t border-gray-100 text-right bg-gray-50/50 flex justify-between items-center">
+              <button
+                onClick={() => handleExportSingleUser(detailUser)}
+                className="bg-green-600 hover:bg-green-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs"
+                title="Download this complete profile info into a JSON backup"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Export User Data (JSON)</span>
+              </button>
               <button
                 onClick={() => { setDetailUser(null); setDetailHistory(null); }}
                 className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs py-2 px-4 rounded-xl cursor-pointer"

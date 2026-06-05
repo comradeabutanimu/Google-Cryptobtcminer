@@ -2737,6 +2737,40 @@ async function startServer() {
     }
   });
 
+  // Admin: Get Supabase integration status and diagnostics
+  app.get('/api/admin/supabase/status', adminAuthenticate, (req, res) => {
+    try {
+      const isConfigured = !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY));
+      res.json({
+        configured: isConfigured,
+        url: process.env.SUPABASE_URL || null,
+        availableTables: Array.from((db as any).availableTables || []),
+        discoveredColumns: Object.fromEntries(
+          Array.from(((db as any).tableColumns || new Map()).entries()).map(([k, v]) => [k, Array.from(v as any)])
+        )
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to fetch Supabase status.' });
+    }
+  });
+
+  // Admin: Trigger manual recheck and dynamic sync with Supabase
+  app.post('/api/admin/supabase/sync', adminAuthenticate, async (req, res) => {
+    try {
+      await db.bootstrapSupabase();
+      res.json({
+        success: true,
+        message: 'Discovered tables successfully. Sync completed!',
+        availableTables: Array.from((db as any).availableTables || []),
+        discoveredColumns: Object.fromEntries(
+          Array.from(((db as any).tableColumns || new Map()).entries()).map(([k, v]) => [k, Array.from(v as any)])
+        )
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to trigger Supabase sync.' });
+    }
+  });
+
 
   // --- DAILY AND LIVE SIMULATED CRON MINING ENGINE ---
   // To keep the user experience incredibly fluid, our server performs 

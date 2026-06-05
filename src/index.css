@@ -121,10 +121,10 @@ html.dark h5,
 html.dark h6,
 html.dark .text-gray-950,
 html.dark .text-gray-900,
-html.dark .text-[#111827],
-html.dark .text-[#1D1B18],
-html.dark .text-[#1a1a1a],
-html.dark .text-[#1A1A1A],
+html.dark .text-\[\#111827\],
+html.dark .text-\[\#1D1B18\],
+html.dark .text-\[\#1a1a1a\],
+html.dark .text-\[\#1A1A1A\],
 html.dark .text-neutral-900 {
   color: #fafaf9 !important;
 }
@@ -133,7 +133,7 @@ html.dark p,
 html.dark .text-gray-750,
 html.dark .text-gray-700,
 html.dark .text-gray-650,
-html.dark .text-[#4B5563],
+html.dark .text-\[\#4B5563\],
 html.dark .text-gray-600 {
   color: #d6d3d1 !important;
 }
@@ -201,7 +201,7 @@ html.dark .bg-emerald-500 * {
 }
 
 /* Custom UI cards highlighting */
-html.dark .bg-[#FDFDFC] {
+html.dark .bg-\[\#FDFDFC\] {
   background-color: #171513 !important;
 }
 

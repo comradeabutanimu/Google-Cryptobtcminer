@@ -119,6 +119,8 @@ export const api = {
     toggleAnnouncement: (id: string, isActive: boolean) => request<any>(`/api/admin/announcements/${id}/toggle`, { method: 'POST', body: JSON.stringify({ is_active: isActive }) }),
     deleteAnnouncement: (id: string) => request<any>(`/api/admin/announcements/${id}/delete`, { method: 'POST' }),
     exportDatabase: () => request<any>('/api/admin/database/export'),
-    importDatabase: (data: any) => request<any>('/api/admin/database/import', { method: 'POST', body: JSON.stringify(data) })
+    importDatabase: (data: any) => request<any>('/api/admin/database/import', { method: 'POST', body: JSON.stringify(data) }),
+    getSupabaseStatus: () => request<any>('/api/admin/supabase/status'),
+    syncSupabase: () => request<any>('/api/admin/supabase/sync', { method: 'POST' })
   }
 };

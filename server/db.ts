@@ -131,7 +131,7 @@ class Database {
     }
   }
 
-  private async bootstrapSupabase() {
+  public async bootstrapSupabase() {
     if (!this.supabaseClient) {
       console.log('Supabase client is not initialized because SUPABASE_URL or SUPABASE_ANON_KEY is missing.');
       return;
@@ -368,8 +368,19 @@ class Database {
   }
 
   private async syncTableToSupabase(tableName: string, rows: any[]) {
-    if (!this.supabaseClient || !this.availableTables.has(tableName) || rows.length === 0) return;
+    if (!this.supabaseClient || rows.length === 0) return;
     try {
+      // Auto register columns to avoid empty filtering
+      let cols = this.tableColumns.get(tableName);
+      if (!cols) {
+        cols = new Set<string>(Object.keys(rows[0]));
+        this.tableColumns.set(tableName, cols);
+      } else {
+        for (const k of Object.keys(rows[0])) {
+          cols.add(k);
+        }
+      }
+
       const formattedRows = rows.map(r => {
         const cleaned = this.filterRowColumns(tableName, r);
         if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
@@ -380,8 +391,15 @@ class Database {
 
       const { error } = await this.supabaseClient.from(tableName).upsert(formattedRows);
       if (error) {
-        console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
+        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
+          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase yet. Run the scheme setup script.`);
+        } else {
+          console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
+        }
       } else {
+        if (!this.availableTables.has(tableName)) {
+          this.availableTables.add(tableName);
+        }
         console.log(`Successfully seeded ${rows.length} rows to Supabase table "${tableName}".`);
       }
     } catch (e: any) {
@@ -390,15 +408,35 @@ class Database {
   }
 
   private async supabaseInsert(tableName: string, row: any) {
-    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
+    if (!this.supabaseClient) return;
     try {
+      // Auto register columns to avoid empty filtering
+      let cols = this.tableColumns.get(tableName);
+      if (!cols) {
+        cols = new Set<string>(Object.keys(row));
+        this.tableColumns.set(tableName, cols);
+      } else {
+        for (const k of Object.keys(row)) {
+          cols.add(k);
+        }
+      }
+
       const cleaned = this.filterRowColumns(tableName, row);
       if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
         cleaned.settings = JSON.stringify(cleaned.settings);
       }
       const { error } = await this.supabaseClient.from(tableName).insert(cleaned);
       if (error) {
-        console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
+        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
+          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase. Signups won't save permanently until Supabase script is executed.`);
+        } else {
+          console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
+        }
+      } else {
+        if (!this.availableTables.has(tableName)) {
+          console.log(`Supabase dynamic sync: Table "${tableName}" successfully verified & synced dynamically!`);
+          this.availableTables.add(tableName);
+        }
       }
     } catch (err: any) {
       console.warn(`Supabase dynamic sync exception for INSERT in "${tableName}": info - ${err.message}`);
@@ -406,15 +444,35 @@ class Database {
   }
 
   private async supabaseUpdate(tableName: string, row: any, id: string) {
-    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
+    if (!this.supabaseClient) return;
     try {
+      // Auto register columns to avoid empty filtering
+      let cols = this.tableColumns.get(tableName);
+      if (!cols) {
+        cols = new Set<string>(Object.keys(row));
+        this.tableColumns.set(tableName, cols);
+      } else {
+        for (const k of Object.keys(row)) {
+          cols.add(k);
+        }
+      }
+
       const cleaned = this.filterRowColumns(tableName, row);
       if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
         cleaned.settings = JSON.stringify(cleaned.settings);
       }
       const { error } = await this.supabaseClient.from(tableName).update(cleaned).eq('id', id);
       if (error) {
-        console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
+        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
+          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase. Changes won't save permanently until Supabase script is executed.`);
+        } else {
+          console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
+        }
+      } else {
+        if (!this.availableTables.has(tableName)) {
+          console.log(`Supabase dynamic sync: Table "${tableName}" successfully verified & synced dynamically!`);
+          this.availableTables.add(tableName);
+        }
       }
     } catch (err: any) {
       console.warn(`Supabase dynamic sync exception for UPDATE in "${tableName}": info - ${err.message}`);
@@ -422,11 +480,19 @@ class Database {
   }
 
   private async supabaseDelete(tableName: string, id: string) {
-    if (!this.supabaseClient || !this.availableTables.has(tableName)) return;
+    if (!this.supabaseClient) return;
     try {
       const { error } = await this.supabaseClient.from(tableName).delete().eq('id', id);
       if (error) {
-        console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
+        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
+          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase.`);
+        } else {
+          console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
+        }
+      } else {
+        if (!this.availableTables.has(tableName)) {
+          this.availableTables.add(tableName);
+        }
       }
     } catch (err: any) {
       console.warn(`Supabase dynamic sync exception for DELETE in "${tableName}": info - ${err.message}`);

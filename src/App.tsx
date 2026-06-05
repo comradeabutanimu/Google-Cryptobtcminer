@@ -13,6 +13,7 @@ import {
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
 import { translations, LanguageCode, LANGUAGES } from './locales.ts';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Core layout/page views imports
 import Navbar from './components/Navbar.tsx';
@@ -1829,14 +1830,6 @@ export default function App() {
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-orange-500 block ring-2 ring-white"></span>
                   )}
                 </button>
-
-                {/* Session sign out button */}
-                <button
-                  onClick={handleSignOut}
-                  className="text-xs font-bold text-gray-400 hover:text-gray-900 border border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                >
-                  Sign Out
-                </button>
               </div>
             </header>
 
@@ -1845,54 +1838,63 @@ export default function App() {
               {userProfile && (
                 <>
                   {/* 2FA SECURITY ALERT BANNER (FEATURE 3) */}
-                  {!userProfile.two_factor_enabled && !dismissed2FaAlert && (
-                    <div id="2fa-security-alert-banner" className="relative mb-6 p-5 pr-10 sm:p-6 sm:pr-12 bg-rose-50 border border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in text-left">
-                      <button
-                        id="close-2fa-alert-button"
-                        onClick={() => {
-                          setDismissed2FaAlert(true);
-                          sessionStorage.setItem('cryptobtc_miner_2fa_alert_dismissed_session', 'true');
-                        }}
-                        className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-rose-100 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
-                        aria-label="Close alert"
+                  <AnimatePresence>
+                    {!userProfile.two_factor_enabled && !dismissed2FaAlert && (
+                      <motion.div
+                        id="2fa-security-alert-banner"
+                        initial={{ opacity: 0, y: -35 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -35 }}
+                        transition={{ type: "tween", ease: "easeOut", duration: 0.45 }}
+                        className="relative mb-6 p-5 pr-10 sm:p-6 sm:pr-12 bg-rose-50 border border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-left origin-top"
                       >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="flex items-start space-x-4">
-                        <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
-                          <ShieldAlert className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-rose-950">
-                            {t.alert2faTitle}
-                          </h4>
-                          <p className="text-xs text-rose-800 font-medium mt-1 leading-relaxed max-w-2xl">
-                            {t.alert2faBody}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3 w-full md:w-auto shrink-0">
                         <button
-                          onClick={() => {
-                            setInitialSettingsSegment('security');
-                            setDashboardTab('settings');
-                          }}
-                          className="flex-1 md:flex-none px-4 py-2 bg-rose-650 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer text-center whitespace-nowrap"
-                        >
-                          {t.enable2fa}
-                        </button>
-                        <button
+                          id="close-2fa-alert-button"
                           onClick={() => {
                             setDismissed2FaAlert(true);
-                            localStorage.setItem('cryptobtc_miner_2fa_alert_dismissed', 'true');
+                            sessionStorage.setItem('cryptobtc_miner_2fa_alert_dismissed_session', 'true');
                           }}
-                          className="flex-1 md:flex-none px-4 py-2 bg-white hover:bg-rose-100/50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
+                          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-rose-100 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                          aria-label="Close alert"
                         >
-                          {t.remindLater}
+                          <X className="h-4 w-4" />
                         </button>
-                      </div>
-                    </div>
-                  )}
+                        <div className="flex items-start space-x-4">
+                          <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
+                            <ShieldAlert className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-rose-950">
+                              {t.alert2faTitle}
+                            </h4>
+                            <p className="text-xs text-rose-800 font-medium mt-1 leading-relaxed max-w-2xl">
+                              {t.alert2faBody}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3 w-full md:w-auto shrink-0">
+                          <button
+                            onClick={() => {
+                              setInitialSettingsSegment('security');
+                              setDashboardTab('settings');
+                            }}
+                            className="flex-1 md:flex-none px-4 py-2 bg-rose-650 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer text-center whitespace-nowrap"
+                          >
+                            {t.enable2fa}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDismissed2FaAlert(true);
+                              localStorage.setItem('cryptobtc_miner_2fa_alert_dismissed', 'true');
+                            }}
+                            className="flex-1 md:flex-none px-4 py-2 bg-white hover:bg-rose-100/50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
+                          >
+                            {t.remindLater}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {dashboardTab === 'overview' && (
                     <Overview 
