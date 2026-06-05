@@ -8,7 +8,7 @@ import {
   BarChart3, Award, Clock, Download, Upload, Bell, Sliders, 
   Users, Settings as SettingsIcon, LifeBuoy, ShieldAlert, Shield, LogOut,
   Menu, X, Sparkles, MessageSquare, Send, Check, AlertTriangle, ChevronDown,
-  Eye, EyeOff, Smartphone, Lock, Globe, Loader, Sun, Moon
+  Eye, EyeOff, Smartphone, Lock, Globe, Loader, Sun, Moon, Volume2, VolumeX
 } from 'lucide-react';
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
@@ -246,13 +246,58 @@ export default function App() {
   };
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [isSoundMuted, setIsSoundMuted] = useState<boolean>(() => {
+    const saved = localStorage.getItem('cryptobtc_miner_sound_muted');
+    return saved === 'true';
+  });
+
+  const synthesizePopSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) {
+        console.warn('Web Audio API is not supported in this browser.');
+        return;
+      }
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      osc.type = 'sine';
+      // High quality, warm bubble pop sweep
+      osc.frequency.setValueAtTime(140, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(520, ctx.currentTime + 0.12);
+      
+      // Enveloped sound
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (err) {
+      console.warn('Synthesis play attempt failed:', err);
+    }
+  };
+
   const playChatPopSound = () => {
+    if (isSoundMuted) return;
     try {
       const audio = new Audio(chatPopSound);
       audio.volume = 0.55;
-      audio.play().catch(ev => console.log('Audio autoplay blocked or deferred:', ev));
+      audio.play().catch(ev => {
+        console.log('Audio file play blocked or deferred, activating real-time synthetic pop:', ev);
+        synthesizePopSound();
+      });
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Audio play failed, activating real-time synthetic pop:', e);
+      synthesizePopSound();
     }
   };
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'bot' | 'user'; text: string; time: string }>>([
@@ -652,6 +697,7 @@ export default function App() {
       }
 
       setChatMessages(prev => [...prev, { sender: 'bot', text: responseText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+      playChatPopSound();
     }, 2200);
   };
 
@@ -2124,15 +2170,40 @@ export default function App() {
             {/* Header */}
             <div className="bg-[#1C1917] text-white p-4 flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center font-bold text-xs">₿</div>
+                <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center font-bold text-xs font-mono">₿</div>
                 <div>
                   <span className="text-xs font-bold block">Tidio Core Live Helpbot</span>
                   <p className="text-[10px] text-gray-400 font-medium leading-none mt-1">Responder status: online</p>
                 </div>
               </div>
-              <button onClick={() => setChatOpen(false)} className="text-gray-400 hover:text-white p-0.5 rounded-md cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center space-x-2">
+                {/* Sound effect tester / toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextMute = !isSoundMuted;
+                    setIsSoundMuted(nextMute);
+                    localStorage.setItem('cryptobtc_miner_sound_muted', String(nextMute));
+                    if (!nextMute) {
+                      // Immediately trigger the synthetic pop to confirm system audio connectivity
+                      setTimeout(() => {
+                        synthesizePopSound();
+                      }, 50);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-white p-1 rounded-md cursor-pointer transition-colors"
+                  title={isSoundMuted ? "Unmute Notification Sound Effects" : "Mute Notification Sound Effects"}
+                >
+                  {isSoundMuted ? (
+                    <VolumeX className="h-4 w-4 text-rose-500" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-emerald-500" />
+                  )}
+                </button>
+                <button onClick={() => setChatOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-md cursor-pointer transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Chat Messages scroll area */}
