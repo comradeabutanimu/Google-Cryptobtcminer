@@ -143,6 +143,40 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
     }
   };
 
+  // State and core method for deleting a user account safely
+  const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    if (userToDelete.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+      toast('The super administrator account cannot be deleted.', 'error');
+      setUserToDelete(null);
+      return;
+    }
+
+    try {
+      const res = await api.admin.deleteUser(userToDelete.id);
+      toast(res.message || 'User account deleted successfully.', 'success');
+      
+      // If we are looking at this user in details view, close it
+      if (detailUser && detailUser.id === userToDelete.id) {
+        setDetailUser(null);
+        setDetailHistory(null);
+      }
+      
+      // Refresh current user list
+      const updatedUsers = await api.admin.getUsers();
+      setUsers(updatedUsers);
+    } catch (err: any) {
+      toast(err.message || 'Failed to delete user account.', 'error');
+    } finally {
+      setUserToDelete(null);
+      setDeleteConfirmationText('');
+    }
+  };
+
   const loadTabContent = async () => {
     setLoading(true);
     try {
@@ -651,6 +685,16 @@ export default function AdminPanel({ toast }: AdminPanelProps) {
                             >
                               {user.is_admin ? 'Supervisor Admin' : 'Make Admin'}
                             </button>
+                            {user.email.toLowerCase() !== 'comradeabutanimu@gmail.com' && (
+                              <button
+                                onClick={() => setUserToDelete(user)}
+                                className="px-2 py-1 text-[10px] font-extrabold bg-rose-50 text-rose-700 hover:bg-rose-100/10 border border-rose-200/50 rounded-lg cursor-pointer inline-flex items-center"
+                                title={`Permanently Delete account of ${user.email}`}
+                              >
+                                <Trash className="h-2.5 w-2.5 mr-0.5 text-rose-600" />
+                                Delete
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -1713,15 +1757,27 @@ CREATE TABLE IF NOT EXISTS announcements (
             </div>
 
             {/* Modal bottom exit bar */}
-            <div className="px-6 py-4.5 border-t border-gray-100 text-right bg-gray-50/50 flex justify-between items-center">
-              <button
-                onClick={() => handleExportSingleUser(detailUser)}
-                className="bg-green-600 hover:bg-green-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs"
-                title="Download this complete profile info into a JSON backup"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>Export User Data (JSON)</span>
-              </button>
+            <div className="px-6 py-4.5 border-t border-gray-100 text-right bg-gray-50/50 flex flex-wrap justify-between items-center gap-3">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleExportSingleUser(detailUser)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs"
+                  title="Download this complete profile info into a JSON backup"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Export User Data (JSON)</span>
+                </button>
+                {detailUser.email.toLowerCase() !== 'comradeabutanimu@gmail.com' && (
+                  <button
+                    onClick={() => setUserToDelete(detailUser)}
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs py-2 px-4 rounded-xl cursor-pointer flex items-center space-x-1.5 shadow-xs"
+                    title={`Permanently delete account for ${detailUser.email}`}
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                    <span>Delete User</span>
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => { setDetailUser(null); setDetailHistory(null); }}
                 className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs py-2 px-4 rounded-xl cursor-pointer"
@@ -1828,6 +1884,61 @@ CREATE TABLE IF NOT EXISTS announcements (
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Account Deletion Safeguard Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-[110] bg-[#000000aa] backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-gray-100 shadow-2xl p-6.5 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-black tracking-tight text-rose-700">Security Halt: Confirm Account Purge</h3>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed font-medium">
+              You are about to permanently delete the profile account and all operational data belonging to <strong className="text-gray-950 font-semibold">{userToDelete.email}</strong>.
+            </p>
+
+            <div className="p-3.5 bg-amber-55/10 rounded-xl border border-amber-100 text-[11px] text-amber-800 space-y-1">
+              <span className="font-extrabold block text-amber-900">⚠️ UNRECOVERABLE DESTRUCTIVE RAMIFICATION</span>
+              <span>This operation will instantly wipe all historical logs, transaction ledgers, deposits, withdrawals, and mining progress associated with user ID ({userToDelete.id}).</span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide text-gray-400 block font-mono">
+                To commit this purge, please type <strong className="text-rose-600">DELETE</strong> below:
+              </label>
+              <input
+                type="text"
+                placeholder="DELETE"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                className="w-full px-4 py-2.5 border border-rose-200 focus:border-rose-500 rounded-xl text-center text-xs font-black tracking-widest text-rose-700 bg-rose-50/20 font-mono focus:outline-hidden transition-all uppercase"
+              />
+            </div>
+
+            <div className="flex space-x-2.5">
+              <button
+                onClick={() => {
+                  setUserToDelete(null);
+                  setDeleteConfirmationText('');
+                }}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xs py-3 rounded-xl cursor-pointer text-center font-sans transition-colors"
+              >
+                Decline Purge
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={deleteConfirmationText.trim().toUpperCase() !== 'DELETE'}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs py-3 rounded-xl cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs border-b-2 border-rose-800"
+              >
+                Execute Purge
+              </button>
+            </div>
           </div>
         </div>
       )}

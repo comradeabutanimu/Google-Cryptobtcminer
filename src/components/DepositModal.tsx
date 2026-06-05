@@ -642,23 +642,35 @@ export default function DepositModal({
                   </div>
 
                   {/* Destination Wallet Address display */}
-                  <div className="space-y-1.5 text-left">
+                  <div className="space-y-2 text-left">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
                       Dedicated Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : selectedNetwork === 'eth' ? 'Ethereum ERC20' : selectedNetwork === 'btc' ? 'Bitcoin' : 'BSC BEP20'})
                     </label>
-                    <div className="flex border border-[#252A36] rounded-xl overflow-hidden focus-within:border-[#F97316] bg-[#12161F]">
-                      <input
-                        type="text"
-                        readOnly
-                        value={payAddress}
-                        className="w-full px-4 py-3 bg-transparent text-xs text-gray-300 font-semibold font-mono focus:outline-none select-all"
-                      />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1 flex border border-[#252A36] rounded-xl overflow-hidden focus-within:border-[#F97316] bg-[#12161F]">
+                        <input
+                          type="text"
+                          readOnly
+                          value={payAddress}
+                          className="w-full px-4 py-3 bg-transparent text-xs text-gray-300 font-semibold font-mono focus:outline-none select-all text-ellipsis overflow-hidden"
+                        />
+                      </div>
                       <button
                         onClick={copyToClipboard}
-                        className="bg-[#1C202F] border-l border-[#252A36] px-4 hover:text-[#F97316] hover:bg-[#1E253A] transition-colors cursor-pointer flex items-center justify-center focus:outline-none"
-                        title="Copy Address"
+                        className="cursor-pointer bg-[#F97316] hover:bg-[#EA580C] text-white font-extrabold text-xs px-5 py-3 rounded-xl transition-all flex items-center justify-center space-x-1.5 shrink-0 shadow-sm border-b-2 border-[#C2410C]"
+                        title="Copy Address to Clipboard"
                       >
-                        {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-gray-300" />}
+                        {copied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-white" />
+                            <span>Address Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5 text-white" />
+                            <span>Copy to Clipboard</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

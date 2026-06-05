@@ -102,6 +102,7 @@ export const api = {
     updateUserAdmin: (userId: string, isAdmin: boolean) => request<any>(`/api/admin/users/${userId}/admin`, { method: 'POST', body: JSON.stringify({ is_admin: isAdmin }) }),
     updateUserEmail: (userId: string, email: string) => request<any>(`/api/admin/users/${userId}/email`, { method: 'POST', body: JSON.stringify({ email }) }),
     updateUserNote: (userId: string, note: string) => request<any>(`/api/admin/users/${userId}/note`, { method: 'POST', body: JSON.stringify({ note }) }),
+    deleteUser: (userId: string) => request<any>(`/api/admin/users/${userId}/delete`, { method: 'POST' }),
     getUserDetail: (userId: string) => request<any>(`/api/admin/users/${userId}/detail`),
 
     getWithdrawals: () => request<any[]>('/api/admin/withdrawals'),

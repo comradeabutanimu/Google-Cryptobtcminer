@@ -2388,6 +2388,40 @@ async function startServer() {
     res.json({ success: true, profile: user });
   });
 
+  // Admin: Delete user account
+  app.post('/api/admin/users/:userId/delete', adminAuthenticate, (req, res) => {
+    const { userId } = req.params;
+
+    const profiles = db.getProfiles();
+    const user = profiles.find(p => p.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    if (user.id === (req as any).user.id) {
+      return res.status(400).json({ error: 'You are forbidden from deleting your own account.' });
+    }
+
+    // Protect super-admin account from other admins
+    if (user.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+      return res.status(403).json({ error: 'Forbidden: The super administrator account cannot be deleted.' });
+    }
+
+    db.deleteProfile(userId);
+
+    // Save delete log for the active operator
+    db.addActivityLog({
+      id: 'act_' + Math.random().toString(36).substr(2, 9),
+      user_id: (req as any).user.id,
+      action: 'Deleted User',
+      details: `Administrator deleted user account ${user.email} (${user.id}).`,
+      created_at: new Date().toISOString()
+    });
+
+    res.json({ success: true, message: `Account for ${user.email} was permanently deleted.` });
+  });
+
   // Admin: change user email address
   app.post('/api/admin/users/:userId/email', adminAuthenticate, (req, res) => {
     const { userId } = req.params;

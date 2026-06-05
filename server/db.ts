@@ -645,6 +645,17 @@ class Database {
     this.supabaseDelete('announcements', id);
   }
 
+  public deleteProfile(id: string) {
+    this.data.profiles = this.data.profiles.filter(p => p.id !== id);
+    this.data.transactions = this.data.transactions.filter(t => t.user_id !== id);
+    this.data.deposits = this.data.deposits.filter(d => d.user_id !== id);
+    this.data.withdrawals = this.data.withdrawals.filter(w => w.user_id !== id);
+    this.data.notifications = this.data.notifications.filter(n => n.user_id !== id);
+    this.data.activity_logs = this.data.activity_logs.filter(a => a.user_id !== id);
+    this.save();
+    this.supabaseDelete('profiles', id);
+  }
+
   public exportDatabase() {
     return this.data;
   }

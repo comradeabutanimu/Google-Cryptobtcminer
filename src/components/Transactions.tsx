@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Download, Upload, Cpu, HeartHandshake, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
+import { Download, Upload, Cpu, HeartHandshake, ChevronLeft, ChevronRight, Inbox, Calendar, Filter, RotateCcw, FileSpreadsheet } from 'lucide-react';
 import { Transaction } from '../types.js';
 
 interface TransactionsProps {
@@ -13,13 +13,44 @@ interface TransactionsProps {
 
 export default function Transactions({ transactions }: TransactionsProps) {
   const [filter, setFilter] = useState<'all' | 'mining' | 'deposit' | 'withdrawal' | 'referral'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // Render correct category pill highlights
+  // Render correct category pill highlights with status and date-range constraints
   const filteredTxs = transactions.filter((tx) => {
-    if (filter === 'all') return true;
-    return tx.type === filter;
+    // 1. Type category filter
+    if (filter !== 'all' && tx.type !== filter) {
+      return false;
+    }
+
+    // 2. Status filter
+    if (statusFilter !== 'all') {
+      if (tx.status !== statusFilter) {
+        return false;
+      }
+    }
+
+    // 3. Date range filter
+    if (startDate) {
+      const startDateTime = new Date(startDate + 'T00:00:00').getTime();
+      const txTime = new Date(tx.created_at).getTime();
+      if (txTime < startDateTime) {
+        return false;
+      }
+    }
+
+    if (endDate) {
+      const endDateTime = new Date(endDate + 'T23:59:59').getTime();
+      const txTime = new Date(tx.created_at).getTime();
+      if (txTime > endDateTime) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   // Pagination bounds
@@ -35,6 +66,45 @@ export default function Transactions({ transactions }: TransactionsProps) {
   const handleFilterChange = (type: typeof filter) => {
     setFilter(type);
     setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setStatusFilter('all');
+    setCurrentPage(1);
+  };
+
+  const handleExportCSV = () => {
+    try {
+      if (!filteredTxs || filteredTxs.length === 0) {
+        return;
+      }
+      
+      const headers = ['Date & Time', 'Transaction ID', 'Type', 'Description', 'Amount (BTC)', 'Status'];
+      const rows = filteredTxs.map(tx => [
+        new Date(tx.created_at).toLocaleString(),
+        tx.id,
+        tx.type.toUpperCase(),
+        tx.description,
+        (tx.type === 'withdrawal' ? '-' : '+') + tx.amount_btc.toFixed(8),
+        tx.status.toUpperCase()
+      ]);
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+        + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `ledger_payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e: any) {
+      console.error(e);
+    }
   };
 
   return (
@@ -62,6 +132,93 @@ export default function Transactions({ transactions }: TransactionsProps) {
               {cat}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Date Range Picker and Status Filters Bar */}
+      <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/50 flex flex-col md:flex-row items-stretch md:items-end justify-between gap-4">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Start Date */}
+          <div className="space-y-1 text-left">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+              <Calendar className="h-3 w-3 text-gray-400" />
+              <span>Start Date</span>
+            </span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
+            />
+          </div>
+
+          {/* End Date */}
+          <div className="space-y-1 text-left">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+              <Calendar className="h-3 w-3 text-gray-400" />
+              <span>End Date</span>
+            </span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div className="space-y-1 text-left">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+              <Filter className="h-3 w-3 text-gray-400" />
+              <span>Status Ledger</span>
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Confirmed / Completed</option>
+              <option value="failed">Failed / Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Buttons Action Panel */}
+        <div className="flex items-center gap-2 shrink-0 self-start md:self-end">
+          {/* Clear/Reset Button */}
+          {(startDate || endDate || statusFilter !== 'all' || filter !== 'all') && (
+            <button
+              onClick={handleResetFilters}
+              className="cursor-pointer bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border border-neutral-200/50 h-[36px]"
+              title="Reset Date and Status Filters to Default"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset Filters</span>
+            </button>
+          )}
+
+          {/* Export to CSV Button */}
+          {filteredTxs.length > 0 && (
+            <button
+              onClick={handleExportCSV}
+              className="cursor-pointer bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4.5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border-b-2 border-orange-700 h-[36px] shadow-xs"
+              title="Export Current Filtered Ledger to CSV file for Tax or Records"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-white" />
+              <span>Export CSV</span>
+            </button>
+          )}
         </div>
       </div>
 
