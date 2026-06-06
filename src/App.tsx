@@ -2146,118 +2146,22 @@ export default function App() {
         <button
           id="tidio-chat-bubble-toggle"
           onClick={() => {
-            const nextState = !chatOpen;
-            setChatOpen(nextState);
-            if (nextState) {
-              playChatPopSound();
+            if ((window as any).tidioChatApi) {
+              try {
+                document.body.classList.add('tidio-chat-open');
+                (window as any).tidioChatApi.open();
+              } catch (e) {
+                console.warn('Tidio API open error:', e);
+              }
+            } else {
+              triggerToast('Tidio live chat is connecting. Please wait a second...', 'success');
             }
           }}
-          className="w-13 h-13 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xl hover:shadow-2xl hover:scale-105 transition-all outline-hidden relative"
-          title="Discuss with Tidio chat assistant"
+          className="w-13 h-13 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xl hover:shadow-2xl hover:scale-105 transition-all outline-hidden relative animate-bounce"
+          title="Discuss with live support associate"
         >
-          {chatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-          
-          {/* Unread dot */}
-          {!chatOpen && chatMessages.length === 1 && (
-            <span className="absolute top-0.5 right-0.5 h-3 w-3 rounded-full bg-[#1C1917] block ring-2 ring-white animate-pulse"></span>
-          )}
+          <MessageSquare className="h-6 w-6" />
         </button>
-
-        {/* Live Chat popup Drawer */}
-        {chatOpen && (
-          <div className="absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-2xl border border-gray-100 shadow-2xl flex flex-col overflow-hidden animate-slide-up select-none">
-            
-            {/* Header */}
-            <div className="bg-[#1C1917] text-white p-4 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center font-bold text-xs font-mono">₿</div>
-                <div>
-                  <span className="text-xs font-bold block">Tidio Core Live Helpbot</span>
-                  <p className="text-[10px] text-gray-400 font-medium leading-none mt-1">Responder status: online</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/* Sound effect tester / toggle */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextMute = !isSoundMuted;
-                    setIsSoundMuted(nextMute);
-                    localStorage.setItem('cryptobtc_miner_sound_muted', String(nextMute));
-                    if (!nextMute) {
-                      // Immediately trigger the synthetic pop to confirm system audio connectivity
-                      setTimeout(() => {
-                        synthesizePopSound();
-                      }, 50);
-                    }
-                  }}
-                  className="text-gray-400 hover:text-white p-1 rounded-md cursor-pointer transition-colors"
-                  title={isSoundMuted ? "Unmute Notification Sound Effects" : "Mute Notification Sound Effects"}
-                >
-                  {isSoundMuted ? (
-                    <VolumeX className="h-4 w-4 text-rose-500" />
-                  ) : (
-                    <Volume2 className="h-4 w-4 text-emerald-500" />
-                  )}
-                </button>
-                <button onClick={() => setChatOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-md cursor-pointer transition-colors">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Messages scroll area */}
-            <div className="flex-1 p-4 overflow-y-auto max-h-72 min-h-60 bg-gray-50/50 space-y-3.5 flex flex-col">
-              {chatMessages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`max-w-[85%] rounded-2xl p-3.5 text-[11px] leading-relaxed relative ${
-                    msg.sender === 'bot'
-                      ? 'bg-white text-gray-700 self-start border border-gray-100 rounded-tl-none'
-                      : 'bg-orange-500 text-white self-end rounded-tr-none font-medium'
-                  }`}
-                >
-                  <p>{msg.text}</p>
-                  <span className={`block text-[9px] mt-1.5 text-right font-mono ${msg.sender === 'bot' ? 'text-gray-400' : 'text-orange-200'}`}>
-                    {msg.time}
-                  </span>
-                </div>
-              ))}
-
-              {isChatTyping && (
-                <div className="max-w-[65%] rounded-2xl p-3 bg-white text-gray-700 self-start border border-gray-100 rounded-tl-none flex items-center space-x-2">
-                  <span className="text-[10px] text-gray-400 font-bold tracking-tight uppercase">Typing</span>
-                  <div className="flex items-center space-x-1 pl-1">
-                    <span className="chat-dot"></span>
-                    <span className="chat-dot"></span>
-                    <span className="chat-dot"></span>
-                  </div>
-                </div>
-              )}
-
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Input send bar footer */}
-            <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about deposits, cash-out logs, miners..."
-                className="w-full px-3 py-2.5 border border-gray-100 rounded-xl focus:border-orange-500 font-medium text-xs outline-hidden"
-              />
-              <button
-                type="submit"
-                className="px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl flex items-center justify-center transition-colors cursor-pointer"
-                title="Transmit email payload"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </form>
-
-          </div>
-        )}
       </div>
 
     </div>

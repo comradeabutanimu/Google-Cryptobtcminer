@@ -9,6 +9,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script src="//code.tidio.co/edb2zn8phudpr1dyn4fihocfwk8m7giw.js" async></script>
+    <script>
+      document.addEventListener('tidioChat:ready', function() {
+        window.tidioChatApi.hide();
+      });
+      document.addEventListener('tidioChat:open', function() {
+        document.body.classList.add('tidio-chat-open');
+      });
+      document.addEventListener('tidioChat:close', function() {
+        document.body.classList.remove('tidio-chat-open');
+      });
+    </script>
   </body>
 </html>
 
