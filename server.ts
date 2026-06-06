@@ -192,7 +192,7 @@ async function startServer() {
       return;
     }
 
-    const commissionUsd = finalUsd * 0.10;
+    const commissionUsd = finalUsd * 0.05;
     const commissionBtc = Number((commissionUsd / btcPrice).toFixed(8));
 
     if (commissionBtc <= 0) {
@@ -648,27 +648,14 @@ async function startServer() {
       }
     };
 
-    // Credit referrer if code match
+    // Notify referrer if code match (without automatic balance credit on registration)
     if (referredBy) {
       const referrer = profiles.find(p => p.id === referredBy);
       if (referrer) {
-        referrer.btc_balance += 10.00; // Credit 10 USDT
-        db.updateProfile(referrer);
-
-        db.addTransaction({
-          id: 'tx_' + Math.random().toString(36).substr(2, 9),
-          user_id: referrer.id,
-          type: 'referral',
-          description: `Referral bonus for inviting ${name}`,
-          amount_btc: 10.00,
-          status: 'completed',
-          created_at: new Date().toISOString()
-        });
-
         db.addNotification({
           id: 'not_' + Math.random().toString(36).substr(2, 9),
           user_id: referrer.id,
-          message: `Congratulations! Referral bonus for inviting ${name} (+10.00 USDT) is credited.`,
+          message: `Your referral invitation was used by ${name} to sign up! You will earn a 5% commission in BTC on all of their future contract deposits/purchases.`,
           is_read: false,
           created_at: new Date().toISOString()
         });

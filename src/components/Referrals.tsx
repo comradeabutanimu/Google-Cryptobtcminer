@@ -77,7 +77,7 @@ export default function Referrals({ toast }: ReferralsProps) {
               </span>
               <h4 className="text-base font-bold text-gray-900">Affiliate Referral Code</h4>
             </div>
-            <p className="text-xs text-gray-400">Invite colleagues to CryptoBTC Miner! For every contract signup, you will immediately receive 0.0001 BTC as dividend cash bonuses!</p>
+            <p className="text-xs text-gray-400">Invite colleagues to CryptoBTC Miner! When your referred client makes a deposit, you will immediately receive a 5% commission of their USDT deposit value, converted into equivalent BTC balance!</p>
           </div>
 
           <div className="space-y-2">
