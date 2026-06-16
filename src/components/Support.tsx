@@ -47,11 +47,25 @@ export default function Support() {
           <p className="text-xs text-gray-400">Our support engineers operate 24/7 assisting with node diagnostics, deposits, and transfers.</p>
         </div>
 
-        {/* Action triggers bottom bubble */}
+        {/* Action triggers Tawk.to assistant */}
         <button
           onClick={() => {
-            const widgetTrigger = document.getElementById('chat-bubble-toggle');
-            if (widgetTrigger) widgetTrigger.click();
+            const tawk = (window as any).Tawk_API;
+            if (tawk && typeof tawk.maximize === 'function') {
+              try {
+                tawk.maximize();
+              } catch (e) {
+                console.warn('Tawk_API maximize error:', e);
+              }
+            } else {
+              // Custom notification that Tawk.to is loading
+              const hasScript = document.querySelector('script[src*="tawk.to"]');
+              if (hasScript) {
+                alert('Live support chat is currently connecting. Please wait a few seconds...');
+              } else {
+                alert('Live support chat system is initializing. Please try again in a moment.');
+              }
+            }
           }}
           className="bg-orange-500 hover:bg-orange-600 px-5  py-2.5 font-bold text-white text-sm rounded-xl cursor-pointer shadow-xs hover:shadow-md transition-all flex items-center space-x-2 shrink-0"
         >

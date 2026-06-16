@@ -136,89 +136,181 @@ export default function Transactions({ transactions }: TransactionsProps) {
       </div>
 
       {/* Date Range Picker and Status Filters Bar */}
-      <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/50 flex flex-col md:flex-row items-stretch md:items-end justify-between gap-4">
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Start Date */}
-          <div className="space-y-1 text-left">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
-              <Calendar className="h-3 w-3 text-gray-400" />
-              <span>Start Date</span>
-            </span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
-            />
-          </div>
+      <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/50 space-y-4">
+        
+        {/* Date Range Preset Shortcuts */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 font-sans mr-1 flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-gray-400" />
+            <span>Range Shortcuts:</span>
+          </span>
+          {[
+            { id: 'all', label: 'All Time' },
+            { id: 'today', label: 'Today' },
+            { id: '7days', label: '7 Days' },
+            { id: '30days', label: '30 Days' },
+            { id: 'thismonth', label: 'This Month' },
+          ].map((preset) => {
+            const today = new Date();
+            const formatDate = (date: Date) => {
+              const y = date.getFullYear();
+              const m = String(date.getMonth() + 1).padStart(2, '0');
+              const d = String(date.getDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
+            };
 
-          {/* End Date */}
-          <div className="space-y-1 text-left">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
-              <Calendar className="h-3 w-3 text-gray-400" />
-              <span>End Date</span>
-            </span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
-            />
-          </div>
+            let isActive = false;
+            if (preset.id === 'all') {
+              isActive = !startDate && !endDate;
+            } else if (preset.id === 'today') {
+              const tStr = formatDate(today);
+              isActive = startDate === tStr && endDate === tStr;
+            } else if (preset.id === '7days') {
+              const past = new Date();
+              past.setDate(today.getDate() - 7);
+              isActive = startDate === formatDate(past) && endDate === formatDate(today);
+            } else if (preset.id === '30days') {
+              const past = new Date();
+              past.setDate(today.getDate() - 30);
+              isActive = startDate === formatDate(past) && endDate === formatDate(today);
+            } else if (preset.id === 'thismonth') {
+              const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+              isActive = startDate === formatDate(firstDay) && endDate === formatDate(today);
+            }
 
-          {/* Status Filter */}
-          <div className="space-y-1 text-left">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
-              <Filter className="h-3 w-3 text-gray-400" />
-              <span>Status Ledger</span>
-            </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all cursor-pointer"
-            >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Confirmed / Completed</option>
-              <option value="failed">Failed / Rejected</option>
-            </select>
-          </div>
+            return (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  const today = new Date();
+                  const formatDate = (date: Date) => {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                  };
+
+                  if (preset.id === 'all') {
+                    setStartDate('');
+                    setEndDate('');
+                  } else if (preset.id === 'today') {
+                    const todayStr = formatDate(today);
+                    setStartDate(todayStr);
+                    setEndDate(todayStr);
+                  } else if (preset.id === '7days') {
+                    const past = new Date();
+                    past.setDate(today.getDate() - 7);
+                    setStartDate(formatDate(past));
+                    setEndDate(formatDate(today));
+                  } else if (preset.id === '30days') {
+                    const past = new Date();
+                    past.setDate(today.getDate() - 30);
+                    setStartDate(formatDate(past));
+                    setEndDate(formatDate(today));
+                  } else if (preset.id === 'thismonth') {
+                    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+                    setStartDate(formatDate(first));
+                    setEndDate(formatDate(today));
+                  }
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-lg border cursor-pointer transition-all duration-150 ${
+                  isActive
+                    ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 md:hover:scale-102 hover:shadow-xs'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Buttons Action Panel */}
-        <div className="flex items-center gap-2 shrink-0 self-start md:self-end">
-          {/* Clear/Reset Button */}
-          {(startDate || endDate || statusFilter !== 'all' || filter !== 'all') && (
-            <button
-              onClick={handleResetFilters}
-              className="cursor-pointer bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border border-neutral-200/50 h-[36px]"
-              title="Reset Date and Status Filters to Default"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset Filters</span>
-            </button>
-          )}
+        {/* Inputs and Filters Row */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-4">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Start Date */}
+            <div className="space-y-1 text-left">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+                <Calendar className="h-3 w-3 text-gray-400" />
+                <span>Start Date</span>
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
+              />
+            </div>
 
-          {/* Export to CSV Button */}
-          {filteredTxs.length > 0 && (
-            <button
-              onClick={handleExportCSV}
-              className="cursor-pointer bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4.5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border-b-2 border-orange-700 h-[36px] shadow-xs"
-              title="Export Current Filtered Ledger to CSV file for Tax or Records"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-white" />
-              <span>Export CSV</span>
-            </button>
-          )}
+            {/* End Date */}
+            <div className="space-y-1 text-left">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+                <Calendar className="h-3 w-3 text-gray-400" />
+                <span>End Date</span>
+              </span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all placeholder-gray-400"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-1 text-left">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center gap-1.5 font-sans">
+                <Filter className="h-3 w-3 text-gray-400" />
+                <span>Status Ledger</span>
+              </span>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+                className="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition-all cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Confirmed / Completed</option>
+                <option value="failed">Failed / Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Buttons Action Panel */}
+          <div className="flex items-center gap-2 shrink-0 self-start md:self-end">
+            {/* Clear/Reset Button */}
+            {(startDate || endDate || statusFilter !== 'all' || filter !== 'all') && (
+              <button
+                onClick={handleResetFilters}
+                className="cursor-pointer bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-extrabold text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border border-neutral-200/50 h-[36px]"
+                title="Reset Date and Status Filters to Default"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Filters</span>
+              </button>
+            )}
+
+            {/* Export to CSV Button */}
+            {filteredTxs.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                className="cursor-pointer bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-4.5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 border-b-2 border-orange-700 h-[36px] shadow-xs"
+                title="Export Current Filtered Ledger to CSV file for Tax or Records"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-white" />
+                <span>Export CSV</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

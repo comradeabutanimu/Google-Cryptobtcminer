@@ -5,26 +5,7 @@
   --font-mono: "Segoe UI Mono", "Roboto Mono", "Courier New", monospace;
 }
 
-@keyframes chatBreathing {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
-  }
-  50% {
-    transform: scale(1.08);
-    box-shadow: 0 15px 30px rgba(249, 115, 22, 0.6);
-  }
-}
 
-#chat-bubble-toggle {
-  animation: chatBreathing 3.5s infinite ease-in-out;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform, opacity;
-}
-
-#chat-bubble-toggle:hover {
-  animation-play-state: paused;
-}
 
 @keyframes chatTypingDot {
   0%, 100% {
@@ -197,11 +178,7 @@ html.dark .bg-\[\#FDFDFC\] {
   background-color: #171513 !important;
 }
 
-/* Support and chat interface refinements */
-html.dark #chat-bubble-toggle {
-  background-color: #f97316 !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
-}
+
 
 html.dark .react-markdown, html.dark .markdown-body {
   color: #d6d3d1 !important;
