@@ -2140,21 +2140,28 @@ export default function App() {
         selectedPlanForModal={selectedPlanForDeposit}
       />
 
-      {/* ==================== GLOBAL FLOATING TIDIO LIVE CHATBOT BUBBLE ==================== */}
+      {/* ==================== GLOBAL FLOATING HUBSPOT LIVE CHAT BUBBLE ==================== */}
       <div className="fixed bottom-6 right-6 z-100 text-xs">
-        {/* Toggle Tidio bubble button widget */}
+        {/* Toggle HubSpot chat bubble button widget */}
         <button
-          id="tidio-chat-bubble-toggle"
+          id="chat-bubble-toggle"
           onClick={() => {
-            if ((window as any).tidioChatApi) {
+            const hs = (window as any).HubSpotConversations;
+            if (hs && hs.widget) {
               try {
-                document.body.classList.add('tidio-chat-open');
-                (window as any).tidioChatApi.open();
+                hs.widget.open();
               } catch (e) {
-                console.warn('Tidio API open error:', e);
+                console.warn('HubSpot API open error:', e);
+                triggerToast('Could not open HubSpot chat window automatically.', 'error');
               }
             } else {
-              triggerToast('Tidio live chat is connecting. Please wait a second...', 'success');
+              console.log('--- HUBSPOT CHAT DIAGNOSTICS ---');
+              console.log('To make HubSpot chat active on this page, please ensure:');
+              console.log('1. Your HubSpot chatflow is turned ON under HubSpot Settings > Inbox > Chatflows.');
+              console.log('2. The current page domain (' + window.location.hostname + ') is whitelisted in your HubSpot chat profile targeting rules.');
+              console.log('3. Your browser ad-blocker/privacy shields are not blocking hscanned trackers (js-eu1.hs-scripts.com).');
+              console.log('--------------------------------');
+              triggerToast('HubSpot Chat is connecting! If it doesn\'t load, please verify your HubSpot targeting rules for ' + window.location.hostname + ' and ensure your chatflow is turned ON.', 'success');
             }
           }}
           className="w-13 h-13 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xl hover:shadow-2xl hover:scale-105 transition-all outline-hidden relative animate-bounce"

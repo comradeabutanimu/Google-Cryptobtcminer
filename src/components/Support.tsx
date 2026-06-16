@@ -50,7 +50,7 @@ export default function Support() {
         {/* Action triggers bottom bubble */}
         <button
           onClick={() => {
-            const widgetTrigger = document.getElementById('tidio-chat-bubble-toggle');
+            const widgetTrigger = document.getElementById('chat-bubble-toggle');
             if (widgetTrigger) widgetTrigger.click();
           }}
           className="bg-orange-500 hover:bg-orange-600 px-5  py-2.5 font-bold text-white text-sm rounded-xl cursor-pointer shadow-xs hover:shadow-md transition-all flex items-center space-x-2 shrink-0"

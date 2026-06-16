@@ -5,43 +5,25 @@
   --font-mono: "Segoe UI Mono", "Roboto Mono", "Courier New", monospace;
 }
 
-@keyframes tidioHeartbeat {
-  0% {
+@keyframes chatBreathing {
+  0%, 100% {
     transform: scale(1);
+    box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
   }
-  14% {
+  50% {
     transform: scale(1.08);
-  }
-  28% {
-    transform: scale(1);
-  }
-  42% {
-    transform: scale(1.08);
-  }
-  70% {
-    transform: scale(1);
-  }
-  100% {
-    transform: scale(1);
+    box-shadow: 0 15px 30px rgba(249, 115, 22, 0.6);
   }
 }
 
-#tidio-chat-bubble-toggle {
-  animation: tidioHeartbeat 3s infinite ease-in-out;
+#chat-bubble-toggle {
+  animation: chatBreathing 3.5s infinite ease-in-out;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, opacity;
 }
 
-#tidio-chat-bubble-toggle:hover {
+#chat-bubble-toggle:hover {
   animation-play-state: paused;
-}
-
-body.tidio-chat-open #tidio-chat-bubble-toggle {
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-  transform: scale(0.5) !important;
-  animation: none !important;
 }
 
 @keyframes chatTypingDot {
@@ -216,21 +198,13 @@ html.dark .bg-\[\#FDFDFC\] {
 }
 
 /* Support and chat interface refinements */
-html.dark #tidio-chat-bubble-toggle {
+html.dark #chat-bubble-toggle {
   background-color: #f97316 !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
 }
 
 html.dark .react-markdown, html.dark .markdown-body {
   color: #d6d3d1 !important;
-}
-
-#tidio-chat-iframe { display: none !important; }
-#tidio-chat { display: none !important; }
-
-body.tidio-chat-open #tidio-chat-iframe,
-body.tidio-chat-open #tidio-chat {
-  display: block !important;
 }
 
 
