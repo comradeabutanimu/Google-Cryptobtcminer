@@ -1,8 +1,10 @@
 # AI Coding Agent Instructions
 
 ## Database Migration & Sync Rules (CRITICAL)
-- **STRICTLY FORBIDDEN**: Do NOT run, write, suggest, or include `DROP TABLE`, `DELETE FROM`, `TRUNCATE`, or any other destructive SQL operations that delete user tables or wipe data.
-- **Wiping Prevention**: Never reset or recreate any existing database table.
+- **STRICTLY FORBIDDEN**: Do NOT run, write, suggest, or include `DROP TABLE`, `DELETE FROM`, `TRUNCATE`, or any other destructive SQL/DDL operations on any Supabase/database table that wipes data, drops tables, or resets tables.
+- **Wiping Prevention**: Never drop, reset, truncate, or recreate any existing table or schema.
 - **Allowed Operations**:
-  - Only use `ALTER TABLE` to perform additive or non-destructive schema changes if modifying existing structures.
-  - Only use `INSERT ... ON CONFLICT DO NOTHING` or `upsert` queries to seed/synchronize initial reference or default data (e.g., plans, initial settings). Always check for existence and resolve conflicts safely without deleting prior rows or resetting auto-increment sequences.
+  - For future database changes, only use `ALTER TABLE ADD COLUMN IF NOT EXISTS` for new columns and `CREATE TABLE IF NOT EXISTS` for brand-new tables.
+- **User Data Preservation**: All existing user data, balances, transactions, deposits, withdrawals, plans, and announcements must be permanently preserved across every single code change, database schema patch, migration, and deployment.
+- **Pre-deployment Verification**: Before every deployment, verify that no destructive SQL exists anywhere in the codebase.
+
