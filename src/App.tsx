@@ -988,7 +988,7 @@ export default function App() {
                     ].map((item, index) => {
                       const isOpen = landingFaqIndex === index;
                       return (
-                        <div key={index} className="bg-white border border-gray-100 rounded-2xl overflow-hidden transition-all duration-200">
+                        <div key={index} className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:bg-orange-500/[0.015] hover:border-orange-500/20 transition-all duration-200">
                           <button
                             onClick={() => setLandingFaqIndex(isOpen ? null : index)}
                             className="w-full text-left p-5 text-sm font-bold text-gray-950 flex justify-between items-center cursor-pointer"
