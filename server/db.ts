@@ -115,7 +115,7 @@ class Database {
             }
             return p;
           }),
-          plans: DEFAULT_PLANS, // Force-sync to our precise specification
+          plans: parsed.plans && parsed.plans.length > 0 ? parsed.plans : DEFAULT_PLANS,
           transactions: parsed.transactions || [],
           deposits: parsed.deposits || [],
           withdrawals: parsed.withdrawals || [],
