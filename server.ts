@@ -942,6 +942,35 @@ async function startServer() {
       return res.status(404).send('<h1>Error</h1><p>Account profile not found.</p>');
     }
 
+    if (user.email && user.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Access Protected - Crypto BTC Miner</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0C0A09; color: #FFFFFF; text-align: center; padding: 60px 20px; }
+            .container { max-width: 500px; margin: 0 auto; background: #1C1917; padding: 40px; border-radius: 20px; border: 1px solid #F97316; box-shadow: 0 10px 40px rgba(249, 115, 22, 0.1); }
+            h1 { color: #F97316; font-size: 24px; margin-bottom: 16px; }
+            p { color: #D6D3D1; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+            .badge { font-weight: bold; background: rgba(249, 115, 22, 0.2); color: #F97316; padding: 8px 16px; border-radius: 9999px; display: inline-block; margin-bottom: 20px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+            a { color: #F97316; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div style="font-size: 50px; margin-bottom: 12px;">🛡️</div>
+            <div class="badge">Super Admin Protected</div>
+            <h1>Account Protection Active</h1>
+            <p>Your main administrator account <strong>${user.email}</strong> represents master supervisor control and is protected from lock links. Your profile has been kept in healthy Active status.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
     user.is_suspended = true;
     db.updateProfile(user);
 
@@ -1538,7 +1567,7 @@ async function startServer() {
   app.get('/api/notifications', authenticate, (req, res) => {
     const user = (req as any).user;
     const notes = db.getNotifications().filter(n => n.user_id === user.id);
-    res.json(notes.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(notes.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // Dismiss user notifications
@@ -1554,14 +1583,14 @@ async function startServer() {
   app.get('/api/transactions', authenticate, (req, res) => {
     const user = (req as any).user;
     const txs = db.getTransactions().filter(t => t.user_id === user.id);
-    res.json(txs.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(txs.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // Active Logs list
   app.get('/api/activity-logs', authenticate, (req, res) => {
     const user = (req as any).user;
     const logs = db.getActivityLogs().filter(l => l.user_id === user.id);
-    res.json(logs.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(logs.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // Referrals table
@@ -1590,7 +1619,7 @@ async function startServer() {
   // Global Announcements for Dashboard Overview
   app.get('/api/announcements', authenticate, (req, res) => {
     const list = db.getAnnouncements().filter(a => a.is_active);
-    res.json(list.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(list.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // --- DEPOSIT NOWPAYMENTS HANDLER & MODAL ---
@@ -2467,10 +2496,10 @@ async function startServer() {
     const wds = db.getWithdrawals().filter(w => w.user_id === userId);
 
     res.json({
-      transactions: txs.sort((a,b) => b.created_at.localeCompare(a.created_at)),
-      activity_logs: logs.sort((a,b) => b.created_at.localeCompare(a.created_at)),
-      deposits: deps.sort((a,b) => b.created_at.localeCompare(a.created_at)),
-      withdrawals: wds.sort((a,b) => b.created_at.localeCompare(a.created_at))
+      transactions: txs.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')),
+      activity_logs: logs.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')),
+      deposits: deps.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')),
+      withdrawals: wds.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || ''))
     });
   });
 
@@ -2493,7 +2522,7 @@ async function startServer() {
       merged = merged.filter(w => w.user_email.toLowerCase() !== 'comradeabutanimu@gmail.com');
     }
 
-    res.json(merged.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(merged.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // Admin: Action withdrawals
@@ -2576,7 +2605,7 @@ async function startServer() {
       merged = merged.filter(d => d.user_email.toLowerCase() !== 'comradeabutanimu@gmail.com');
     }
 
-    res.json(merged.sort((a,b) => b.created_at.localeCompare(a.created_at)));
+    res.json(merged.sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')));
   });
 
   // Admin Manual Overrides for Deposits

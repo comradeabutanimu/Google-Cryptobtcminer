@@ -113,6 +113,9 @@ class Database {
             if (p.active_plan === 'plan_free' || p.active_plan === 'free') {
               p.active_plan = null;
             }
+            if (p.email && p.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+              p.is_suspended = false;
+            }
             return p;
           }),
           plans: parsed.plans && parsed.plans.length > 0 ? parsed.plans : DEFAULT_PLANS,
@@ -181,6 +184,9 @@ class Database {
             }
             if (!unified.passwordHash && unified.password_hash) {
               unified.passwordHash = unified.password_hash;
+            }
+            if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+              unified.is_suspended = false;
             }
             return {
               ...unified,
@@ -587,10 +593,16 @@ class Database {
   }
 
   public updateProfile(updated: Profile) {
+    if (updated.email && updated.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+      updated.is_suspended = false;
+    }
     const idx = this.data.profiles.findIndex(p => p.id === updated.id);
     if (idx !== -1) {
       const original = this.data.profiles[idx];
       const merged = { ...original, ...updated };
+      if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+        merged.is_suspended = false;
+      }
       this.data.profiles[idx] = merged;
       this.save();
       this.supabaseUpdate('profiles', merged, updated.id);

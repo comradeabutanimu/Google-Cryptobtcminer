@@ -572,7 +572,7 @@ export default function App() {
       const notList = await api.getNotifications();
       setNotifications(notList);
     } catch (e) {
-      console.error('Error syncing dynamic dashboard elements.');
+      console.error('Error syncing dynamic dashboard elements:', e);
     }
   };
 

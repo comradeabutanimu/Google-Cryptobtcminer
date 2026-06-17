@@ -201,10 +201,26 @@ export default function DepositModal({
 
   const copyToClipboard = () => {
     if (!payAddress) return;
-    navigator.clipboard.writeText(payAddress);
-    setCopied(true);
-    toast(`${selectedNetwork === 'eth' ? 'ETH' : selectedNetwork === 'btc' ? 'BTC' : 'USDT'} deposit wallet address copied to clipboard!`, 'success');
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(payAddress);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = payAddress;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      toast(`${selectedNetwork === 'eth' ? 'ETH' : selectedNetwork === 'btc' ? 'BTC' : 'USDT'} deposit wallet address copied to clipboard!`, 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Could not copy text: ', err);
+      toast('Failed to copy automatically. Please select and copy manually.', 'error');
+    }
   };
 
   // Run Sandbox Mock payment override validator for testing
@@ -647,13 +663,24 @@ export default function DepositModal({
                       Dedicated Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : selectedNetwork === 'eth' ? 'Ethereum ERC20' : selectedNetwork === 'btc' ? 'Bitcoin' : 'BSC BEP20'})
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1 flex border border-[#252A36] rounded-xl overflow-hidden focus-within:border-[#F97316] bg-[#12161F]">
+                      <div 
+                        onClick={copyToClipboard}
+                        className="flex-1 flex border border-[#252A36] hover:border-[#F97316]/50 rounded-xl overflow-hidden focus-within:border-[#F97316] bg-[#12161F] cursor-pointer group transition-all relative"
+                        title="Click to copy destination address"
+                      >
                         <input
                           type="text"
                           readOnly
                           value={payAddress}
-                          className="w-full px-4 py-3 bg-transparent text-xs text-gray-300 font-semibold font-mono focus:outline-none select-all text-ellipsis overflow-hidden"
+                          className="w-full pl-4 pr-10 py-3 bg-transparent text-xs text-gray-300 font-semibold font-mono focus:outline-none cursor-pointer select-all text-ellipsis overflow-hidden"
                         />
+                        <div className="absolute right-3.5 top-3.5 text-gray-500 group-hover:text-[#F97316] transition-colors pointer-events-none">
+                          {copied ? (
+                            <Check className="h-4 w-4 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={copyToClipboard}
