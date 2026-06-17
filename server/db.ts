@@ -87,7 +87,7 @@ class Database {
   constructor() {
     this.data = {
       profiles: [],
-      plans: DEFAULT_PLANS,
+      plans: [], // Start empty, always load from Supabase
       transactions: [],
       deposits: [],
       withdrawals: [],
@@ -118,7 +118,7 @@ class Database {
             }
             return p;
           }),
-          plans: parsed.plans && parsed.plans.length > 0 ? parsed.plans : DEFAULT_PLANS,
+          plans: parsed.plans && parsed.plans.length > 0 ? parsed.plans : [],
           transactions: parsed.transactions || [],
           deposits: parsed.deposits || [],
           withdrawals: parsed.withdrawals || [],
@@ -210,25 +210,22 @@ class Database {
 
       // 2. Fetch Plans
       const { data: plans, error: plError } = await this.supabaseClient.from('plans').select('*');
-      if (!plError && plans) {
+      if (!plError && plans && plans.length > 0) {
         this.availableTables.add('plans');
-        if (plans.length > 0) {
-          this.data.plans = plans;
-          console.log(`Plans loaded from Supabase: ${plans.length} plans`);
-          this.save();
-        } else {
-          // Only use DEFAULT_PLANS if both Supabase and local db.json have zero plans
-          if (!this.data.plans || this.data.plans.length === 0) {
-            this.data.plans = DEFAULT_PLANS;
-          }
-          await this.syncTableToSupabase('plans', this.data.plans);
+        this.data.plans = plans;
+        console.log('Plans loaded from Supabase: ' + plans.length + ' plans');
+      } else if (!plError && plans && plans.length === 0) {
+        this.availableTables.add('plans');
+        // Only seed DEFAULT_PLANS if Supabase is completely empty
+        await this.syncTableToSupabase('plans', DEFAULT_PLANS);
+        this.data.plans = DEFAULT_PLANS;
+        console.log('Seeded default plans to Supabase');
+      } else {
+        // Supabase error - keep existing plans if any, otherwise use defaults
+        if (this.data.plans.length === 0) {
+          this.data.plans = DEFAULT_PLANS;
         }
-      } else if (plError) {
-        if (plError.message.includes('Could not find the table') || plError.message.includes('relation "')) {
-          console.warn('⚠️  Table "plans" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading plans from Supabase:', plError.message);
-        }
+        console.log('Plans loaded from local storage: ' + this.data.plans.length + ' plans');
       }
 
       // 3. Fetch Transactions
