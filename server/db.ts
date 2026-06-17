@@ -214,8 +214,13 @@ class Database {
         this.availableTables.add('plans');
         if (plans.length > 0) {
           this.data.plans = plans;
-          console.log(`Loaded ${plans.length} plans from Supabase.`);
+          console.log(`Plans loaded from Supabase: ${plans.length} plans`);
+          this.save();
         } else {
+          // Only use DEFAULT_PLANS if both Supabase and local db.json have zero plans
+          if (!this.data.plans || this.data.plans.length === 0) {
+            this.data.plans = DEFAULT_PLANS;
+          }
           await this.syncTableToSupabase('plans', this.data.plans);
         }
       } else if (plError) {
