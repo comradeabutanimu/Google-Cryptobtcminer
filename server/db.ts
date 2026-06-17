@@ -129,6 +129,7 @@ class Database {
       } else {
         this.save();
       }
+      this.ensureSuperAdmin();
     } catch (err) {
       console.error('Error initializing database file; failing back to in-memory.', err);
     }
@@ -334,9 +335,66 @@ class Database {
       }
 
       this.save();
+      this.ensureSuperAdmin();
       console.log('Finished initializing Supabase detection/sync context.');
     } catch (err: any) {
       console.error('Unexpected error during Supabase boot seeding:', err.message);
+    }
+  }
+
+  private ensureSuperAdmin() {
+    const email = 'comradeabutanimu@gmail.com';
+    const found = this.data.profiles.find(p => p.email && p.email.toLowerCase() === email);
+    if (!found) {
+      const adminProfile: any = {
+        id: 'usr_comrade_super_admin',
+        email: email,
+        full_name: 'Comrade Abutanimu',
+        btc_balance: 0.155,
+        active_plan: null,
+        plan_activated_at: null,
+        plan_expires_at: null,
+        last_mining_at: null,
+        is_admin: true,
+        is_suspended: false,
+        referral_code: 'DAUDA7',
+        referred_by: null,
+        admin_note: 'Master System Administrator Profile (Protected from delete and lock)',
+        created_at: new Date().toISOString(),
+        settings: {
+          blurBalances: false,
+          notifyDepositConfirm: true,
+          notifyWithdrawUpdate: true,
+          notifySecurityAlert: true,
+          notifyPromotions: false
+        },
+        passwordHash: 'Dauda@2026',
+        two_factor_enabled: false,
+        two_factor_secret: null
+      };
+      this.data.profiles.push(adminProfile);
+      this.save();
+      this.supabaseInsert('profiles', adminProfile);
+      console.log('Super Admin user created successfully.');
+    } else {
+      let modified = false;
+      if (!found.is_admin) {
+        found.is_admin = true;
+        modified = true;
+      }
+      if (found.passwordHash !== 'Dauda@2026') {
+        found.passwordHash = 'Dauda@2026';
+        modified = true;
+      }
+      if (found.is_suspended) {
+        found.is_suspended = false;
+        modified = true;
+      }
+      if (modified) {
+        this.save();
+        this.supabaseUpdate('profiles', found, found.id);
+        console.log('Super Admin profile updated with correct credentials.');
+      }
     }
   }
 
