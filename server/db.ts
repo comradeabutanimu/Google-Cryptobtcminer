@@ -191,6 +191,12 @@ class Database {
             }
             return {
               ...unified,
+              active_plan: unified.active_plan || null,
+              plan_activated_at: unified.plan_activated_at || null,
+              plan_expires_at: unified.plan_expires_at || null,
+              last_mining_at: unified.last_mining_at || null,
+              locked_capital: unified.locked_capital || 0,
+              deposit_usd_value: unified.deposit_usd_value || 0,
               settings: typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings
             };
           });
