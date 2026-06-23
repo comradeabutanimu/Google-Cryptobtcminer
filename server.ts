@@ -63,6 +63,351 @@ const sendEmail = async (to: string, subject: string, htmlContent: string) => {
   }
 };
 
+const sendMiningContractEmail = async (user: Profile, deposit: Deposit, appUrl: string) => {
+  const depositAmountUsd = deposit.amount_usd || 0;
+  
+  // Calculate plan variables based on investment
+  let planId = 'plan_starter';
+  let planName = 'Starter';
+  let durationDays = 60;
+  let ratePercent = 1.5;
+  let hashRateGhs = depositAmountUsd;
+
+  if (depositAmountUsd >= 50000) {
+    planId = 'plan_vip';
+    planName = 'VIP';
+    ratePercent = 5.0;
+    durationDays = 180;
+    hashRateGhs = Math.round(depositAmountUsd / 3);
+  } else if (depositAmountUsd >= 10000) {
+    planId = 'plan_pro';
+    planName = 'Pro';
+    ratePercent = 3.0;
+    durationDays = 90;
+    hashRateGhs = Math.round(depositAmountUsd / 3);
+  }
+
+  // Deduce payment network from user's deposit initiation log or default to USDT-TRC20
+  let network = 'USDT-TRC20';
+  try {
+    const logs = db.getActivityLogs().filter(l => l.user_id === user.id);
+    const log = logs.find(l => l.action === 'Deposit Initiated' && l.details.includes(deposit.invoice_id));
+    if (log) {
+      const detailStr = log.details.toUpperCase();
+      if (detailStr.includes('USDTTRC20') || detailStr.includes('TRC20') || detailStr.includes('TRON')) {
+        network = 'USDT-TRC20';
+      } else if (detailStr.includes('USDTBSC') || detailStr.includes('BEP20') || detailStr.includes('BSC')) {
+        network = 'USDT-BEP20';
+      } else if (detailStr.includes('ETH') || detailStr.includes('ERC20')) {
+        network = 'USDT-ERC20';
+      } else if (detailStr.includes('BTC') || detailStr.includes('BITCOIN')) {
+        network = 'BTC';
+      }
+    } else {
+      if (deposit.invoice_id?.startsWith('nowp_') || (deposit.amount_btc > 0 && deposit.amount_usd === 0)) {
+        network = 'BTC';
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Ensure these fields align with the activated plan on user profile if present
+  const pName = user.active_plan === 'plan_starter' ? 'Starter' : user.active_plan === 'plan_pro' ? 'Pro' : user.active_plan === 'plan_vip' ? 'VIP' : planName;
+  const rateVal = user.active_plan_rate ? (user.active_plan_rate * 100) : ratePercent;
+  const hRate = user.active_plan_hash_rate || hashRateGhs;
+  const activePlanName = pName;
+
+  const dailyProfitUsd = Number((depositAmountUsd * (rateVal / 100)).toFixed(2));
+  const totalExpectedProfit = Number((dailyProfitUsd * durationDays).toFixed(2));
+  const totalExpectedReturn = Number((depositAmountUsd + totalExpectedProfit).toFixed(2));
+
+  // Handle plan dates
+  const planStartStr = user.plan_activated_at ? new Date(user.plan_activated_at).toLocaleString() : new Date().toLocaleString();
+  const expiryDateMs = user.plan_expires_at ? new Date(user.plan_expires_at).getTime() : Date.now() + durationDays * 24 * 60 * 60 * 1000;
+  const planExpiryStr = new Date(expiryDateMs).toLocaleString();
+  const finalExpiryDateSimple = new Date(expiryDateMs).toLocaleDateString();
+
+  const formattedBtc = (deposit.amount_btc || 0).toFixed(8);
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mining Contract Activated — CryptoBTC Miner</title>
+  <style>
+    body {
+      background-color: #0b0f19;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper {
+      background-color: #0b0f19;
+      width: 100%;
+      padding: 40px 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+    .header {
+      padding: 30px 20px;
+      text-align: center;
+      border-bottom: 1px solid #1f2937;
+    }
+    .logo-text {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .logo-orange {
+      color: #f97316;
+    }
+    .logo-white {
+      color: #ffffff;
+    }
+    .banner {
+      background-color: #064e3b;
+      border-top: 4px solid #10b981;
+      padding: 20px;
+      text-align: center;
+    }
+    .banner-title {
+      color: #10b981;
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 5px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .banner-sub {
+      color: #34d399;
+      font-size: 14px;
+      margin: 0;
+    }
+    .content {
+      padding: 30px 25px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f97316;
+      margin-top: 0;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-left: 3px solid #f97316;
+      padding-left: 8px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    .data-table td {
+      padding: 12px 0;
+      border-bottom: 1px solid #1f2937;
+      font-size: 14px;
+    }
+    .data-table td.label {
+      color: #9ca3af;
+      width: 45%;
+    }
+    .data-table td.value {
+      color: #ffffff;
+      font-weight: 600;
+      text-align: right;
+    }
+    .notice-box {
+      background-color: #1e1b4b;
+      border: 1px solid #312e81;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .notice-item {
+      font-size: 13.5px;
+      color: #c7d2fe;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .notice-item:last-child {
+      margin-bottom: 0;
+    }
+    .bullet {
+      color: #f97316;
+      margin-right: 6px;
+      font-weight: bold;
+    }
+    .btn-container {
+      text-align: center;
+      margin: 35px 0 15px 0;
+    }
+    .btn {
+      background-color: #f97316;
+      color: #ffffff !important;
+      padding: 14px 30px;
+      font-weight: 700;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 15px;
+      display: inline-block;
+      transition: background-color 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.2);
+    }
+    .footer {
+      background-color: #0b0f19;
+      padding: 30px 20px;
+      text-align: center;
+      border-top: 1px solid #1f2937;
+    }
+    .footer-text {
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.7;
+      margin: 0 0 15px 0;
+    }
+    .security-badge {
+      font-size: 11px;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <a href="${appUrl}" style="text-decoration: none;" class="logo-text">
+          <span class="logo-orange">🪙 CryptoBTC</span> <span class="logo-white">Miner</span>
+        </a>
+      </div>
+      
+      <div class="banner">
+        <h1 class="banner-title">Your Mining Contract is Now Active</h1>
+        <p class="banner-sub">Nodes Successfully Connected • Hashing Process Initialized</p>
+      </div>
+      
+      <div class="content">
+        <h2 class="section-title">Deposit Invoice Section</h2>
+        <table class="data-table">
+          <tr>
+            <td class="label">Invoice ID</td>
+            <td class="value" style="font-family: monospace; font-size: 13px;">${deposit.invoice_id}</td>
+          </tr>
+          <tr>
+            <td class="label">Deposit Amount (in USDT)</td>
+            <td class="value" style="color: #10b981;">$${depositAmountUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</td>
+          </tr>
+          <tr>
+            <td class="label">BTC Equivalent</td>
+            <td class="value" style="font-family: monospace;">${formattedBtc} BTC</td>
+          </tr>
+          <tr>
+            <td class="label">Payment Network</td>
+            <td class="value" style="color: #f97316;">${network}</td>
+          </tr>
+          <tr>
+            <td class="label">Date and Time of deposit</td>
+            <td class="value">${new Date(deposit.created_at).toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">Transaction Status</td>
+            <td class="value"><span style="background-color: #064e3b; color: #34d399; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; border: 1px solid #059669;">Confirmed</span></td>
+          </tr>
+        </table>
+        
+        <h2 class="section-title">Mining Plan Details Section</h2>
+        <table class="data-table">
+          <tr>
+            <td class="label">Plan Name</td>
+            <td class="value">${activePlanName} Plan</td>
+          </tr>
+          <tr>
+            <td class="label">Hash Rate assigned</td>
+            <td class="value" style="font-family: monospace; font-weight: bold; color: #f97316;">${hRate.toLocaleString()} GH/s</td>
+          </tr>
+          <tr>
+            <td class="label">Daily Return Percentage</td>
+            <td class="value">${rateVal.toFixed(1)}% Daily</td>
+          </tr>
+          <tr>
+            <td class="label">Daily Profit in USD</td>
+            <td class="value" style="color: #10b981;">+$${dailyProfitUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
+          </tr>
+          <tr>
+            <td class="label">Plan Start Date</td>
+            <td class="value">${planStartStr}</td>
+          </tr>
+          <tr>
+            <td class="label">Plan Expiry Date</td>
+            <td class="value">${planExpiryStr}</td>
+          </tr>
+          <tr>
+            <td class="label">Total Duration</td>
+            <td class="value">${durationDays} days</td>
+          </tr>
+          <tr>
+            <td class="label">Total Expected Profit</td>
+            <td class="value" style="color: #10b981;">+$${totalExpectedProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</td>
+          </tr>
+          <tr>
+            <td class="label">Total Expected Return</td>
+            <td class="value" style="font-size: 16px; color: #ffffff; font-weight: 700;">$${totalExpectedReturn.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</td>
+          </tr>
+        </table>
+        
+        <h2 class="section-title">Important Notice Section</h2>
+        <div class="notice-box">
+          <div class="notice-item">
+            <span class="bullet">•</span> Your deposited capital of <strong>$${depositAmountUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</strong> is locked until <strong>${finalExpiryDateSimple}</strong>
+          </div>
+          <div class="notice-item">
+            <span class="bullet">•</span> Daily profits are credited to your Available Balance every 24 hours
+          </div>
+          <div class="notice-item">
+            <span class="bullet">•</span> Minimum withdrawal amount is <strong>$7</strong>
+          </div>
+          <div class="notice-item">
+            <span class="bullet">•</span> You can track your earnings in real time on your dashboard
+          </div>
+        </div>
+        
+        <div class="btn-container">
+          <a href="${appUrl}/dashboard" class="btn">Go to Dashboard</a>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p class="footer-text">
+          This is an automated confirmation. Do not reply to this email.<br>
+          If you did not make this deposit contact <a href="mailto:support@cyptobtcminer.com" style="color: #f97316; text-decoration: none;">support@cyptobtcminer.com</a> immediately
+        </p>
+        <div class="security-badge">
+          SSL Secured • 256-bit Encryption • Licensed Platform
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendEmail(user.email, '✅ Mining Contract Activated — CryptoBTC Miner', htmlContent);
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -1935,6 +2280,11 @@ async function startServer() {
     activateDynamicPlanForUser(user, deposit.amount_usd);
     db.updateProfile(user);
 
+    const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    sendMiningContractEmail(user, deposit, appUrl).catch(err => {
+      console.error('[Sandbox Trigger Email Error]', err);
+    });
+
     // Apply referral commission credit
     creditReferralCommission(user.id, deposit.amount_usd, deposit.amount_btc);
 
@@ -2220,6 +2570,11 @@ async function startServer() {
           
           activateDynamicPlanForUser(user, deposit.amount_usd);
           db.updateProfile(user);
+
+          const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+          sendMiningContractEmail(user, deposit, appUrl).catch(err => {
+            console.error('[Webhook Trigger IPN Email Error]', err);
+          });
 
           // Apply referral commission credit
           creditReferralCommission(user.id, deposit.amount_usd, deposit.amount_btc);
@@ -2640,6 +2995,11 @@ async function startServer() {
       // Confirm and activate dynamic contract node based on USDT investment amount, which locks the capital instantly
       activateDynamicPlanForUser(user, depositIndex.amount_usd);
       db.updateProfile(user);
+
+      const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      sendMiningContractEmail(user, depositIndex, appUrl).catch(err => {
+        console.error('[Admin Confirmation Email Error]', err);
+      });
 
       // Apply referral commission credit
       creditReferralCommission(user.id, depositIndex.amount_usd, depositIndex.amount_btc);
