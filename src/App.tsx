@@ -8,7 +8,8 @@ import {
   BarChart3, Award, Clock, Download, Upload, Bell, Sliders, 
   Users, Settings as SettingsIcon, LifeBuoy, ShieldAlert, Shield, LogOut,
   Menu, X, Sparkles, MessageSquare, Send, Check, AlertTriangle, ChevronDown,
-  Eye, EyeOff, Smartphone, Lock, Globe, Loader, Sun, Moon, Volume2, VolumeX
+  Eye, EyeOff, Smartphone, Lock, Globe, Loader, Sun, Moon, Volume2, VolumeX,
+  Zap, Cpu, ShieldCheck, Star, ArrowRight, LineChart
 } from 'lucide-react';
 import { api, setToken, getToken, clearToken } from './lib/api.js';
 import { Profile, Plan, Transaction, Announcement, CoingeckoPrice } from './types.js';
@@ -215,6 +216,15 @@ export default function App() {
 
   // Initial settings segment
   const [initialSettingsSegment, setInitialSettingsSegment] = useState<'profile' | 'security' | 'privacy' | 'notifications'>('profile');
+
+  // Live landing page real-time counter
+  const [liveBtcMined, setLiveBtcMined] = useState<number>(2430.45781290);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveBtcMined(prev => prev + 0.00000004 + Math.random() * 0.00000003);
+    }, 1300);
+    return () => clearInterval(interval);
+  }, []);
 
   // UI state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
@@ -738,73 +748,140 @@ export default function App() {
 
           {/* ==================== HOME PAGE LAYOUT ==================== */}
           {currentPage === 'home' && (
-            <div className="flex-1">
+            <div className="flex-1 bg-[#070A0F] text-neutral-300 relative overflow-hidden">
+              <style>{`
+                @keyframes marquee {
+                  0% { transform: translateX(0%); }
+                  100% { transform: translateX(-50%); }
+                }
+                @keyframes scanline {
+                  0% { transform: translateY(-100%); }
+                  100% { transform: translateY(100%); }
+                }
+                @keyframes pulse-ring {
+                  0% { transform: scale(0.95); opacity: 0.5; }
+                  50% { transform: scale(1.1); opacity: 0.8; }
+                  100% { transform: scale(0.95); opacity: 0.5; }
+                }
+              `}</style>
+
+              {/* BACKGROUND PARTICLES AND MESH LAYER */}
+              <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+                <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-gradient-radial from-[#F97316]/10 via-[#ea580c]/5 to-transparent rounded-full filter blur-[120px]" />
+                <div className="absolute -right-[15%] top-[20%] w-[50%] h-[50%] bg-gradient-radial from-amber-500/10 via-yellow-600/5 to-transparent rounded-full filter blur-[100px]" />
+                <div className="absolute left-[30%] top-[60%] w-[45%] h-[45%] bg-gradient-radial from-orange-600/5 via-transparent to-transparent rounded-full filter blur-[140px]" />
+                {/* Tech grid mask */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:40px_40px] opacity-70" />
+              </div>
+
               {/* HERO SECTION */}
-              <section className="relative overflow-hidden bg-gradient-to-br from-[#FAFAF9] to-[#FEE2E2] pt-16 pb-20 sm:pt-24 sm:pb-28 border-b border-[#E7E7E4]">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
+              <section className="relative z-10 pt-20 pb-16 sm:pt-28 sm:pb-24 border-b border-[#1C212E]/80">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
                   
                   {/* Banner LIVE Mining badge */}
-                  <div className="inline-flex items-center space-x-2 bg-[#DCFCE7] text-[#166534] px-4 py-1.5 rounded-full text-xs font-semibold">
+                  <div className="inline-flex items-center space-x-2 bg-[#F97316]/10 border border-[#F97316]/30 text-[#F97316] px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md">
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22C55E]"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F97316] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F97316]"></span>
                     </span>
-                    <span>Mining live · 428 PH/s active</span>
+                    <span>Mining Nodes Live · 524 PH/s pool hash</span>
                   </div>
 
                   {/* Core H1 Header Display typography */}
-                  <h1 className="text-4xl sm:text-[56px] font-extrabold text-[#1A1A1A] tracking-tight leading-none max-w-4xl mx-auto">
-                    Mine Bitcoin from the cloud. <br className="hidden sm:inline" />
-                    <span className="text-[#F97316]">Earn every single day.</span>
-                  </h1>
-
-                  {/* Subtitle */}
-                  <p className="max-w-xl mx-auto text-base sm:text-[18px] text-[#4B5563] font-medium leading-relaxed">
-                    Skip the hardware. Skip the electricity bills. Pick a plan, deposit USDT, and watch your BTC balance grow with zero technical effort.
-                  </p>
+                  <div className="space-y-4">
+                    <h1 className="text-4xl sm:text-[76px] font-black text-white tracking-tight leading-[0.95] max-w-5xl mx-auto">
+                      Enterprise-Grade <br />
+                      <span className="bg-gradient-to-r from-[#F97316] via-amber-500 to-[#FEE2E2] bg-clip-text text-transparent">Bitcoin Cloud Hashing</span>
+                    </h1>
+                    <p className="max-w-3xl mx-auto text-base sm:text-lg text-neutral-400 font-medium leading-relaxed">
+                      Instant access to state-of-the-art ASIC mining grids without the noise, heat, or soaring energy bills. Pick a target contract, fund securely, and watch mining rewards payout daily.
+                    </p>
+                  </div>
 
                   {/* Hero Actions Rounded Pills */}
-                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4 max-w-sm sm:max-w-md mx-auto">
                     <button
                       onClick={() => setCurrentPage('register')}
-                      className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#F97316] hover:bg-[#EA580C] font-semibold text-sm text-white shadow-xs hover:shadow-md transition-all cursor-pointer text-center"
+                      className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 font-bold text-sm text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 transition-all cursor-pointer text-center"
                     >
-                      Start mining now
+                      Start Hashing Now
                     </button>
                     <button
                       onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-white hover:bg-neutral-50 border border-[#D1D5DB] font-semibold text-sm text-[#1A1A1A] shadow-xs cursor-pointer text-center"
+                      className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#12161F] hover:bg-[#1A202C] border border-[#252A36] font-bold text-sm text-white shadow-sm transition-all cursor-pointer text-center"
                     >
-                      View plans
+                      Browse Contracts
                     </button>
                   </div>
 
-                  {/* High-fidelity Dashboard preview block conforming to Design HTML */}
-                  <div className="pt-10 max-w-md mx-auto animate-fade-in text-left">
-                    <div className="bg-[#1A1A1A] rounded-2xl shadow-2xl p-6 text-white border border-neutral-800">
-                      <div className="flex justify-between items-center mb-8">
-                        <span className="text-xs font-semibold opacity-60 uppercase tracking-widest">Mining Overview</span>
-                        <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-sm font-bold">
-                          ⚙
+                  {/* TRUST BADGES ROW */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 max-w-4xl mx-auto">
+                    <div className="flex items-center space-x-3 bg-[#0C0E14]/70 border border-[#1C212E] p-4 rounded-xl text-left backdrop-blur-md">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">SSL Secured Network</h4>
+                        <p className="text-[11px] text-neutral-500 leading-tight">Bank-grade encrypted endpoints</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 bg-[#0C0E14]/70 border border-[#1C212E] p-4 rounded-xl text-left backdrop-blur-md">
+                      <div className="w-10 h-10 rounded-lg bg-[#F97316]/10 flex items-center justify-center text-[#F97316] shrink-0">
+                        <Lock className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">256-Bit Hardware Encrypted</h4>
+                        <p className="text-[11px] text-neutral-500 leading-tight">Secured isolation key systems</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 bg-[#0C0E14]/70 border border-[#1C212E] p-4 rounded-xl text-left backdrop-blur-md">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
+                        <Award className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Licensed & Regulated</h4>
+                        <p className="text-[11px] text-neutral-500 leading-tight">UK House Broker No. 14392019</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* INSTITUTIONAL LIVE STATISTICS BAR */}
+                  <div className="pt-8">
+                    <div className="bg-[#0C0E14]/90 border border-t border-[#1C212E] rounded-2xl grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[#1C212E] overflow-hidden p-6 shadow-xl">
+                      <div className="p-4 text-center">
+                        <span className="block text-2xl sm:text-3.5xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2 font-mono">
+                          198,740+
+                        </span>
+                        <span className="block text-[10px] text-neutral-500 font-extrabold uppercase tracking-widest">
+                          Global Cloud Users
+                        </span>
+                      </div>
+                      <div className="p-4 text-center">
+                        <div className="flex items-center justify-center space-x-1.5 mb-2">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                          <span className="text-2xl sm:text-3.5xl font-extrabold text-white tracking-tight leading-none font-mono">
+                            {liveBtcMined.toFixed(8)}
+                          </span>
                         </div>
+                        <span className="block text-[10px] text-neutral-500 font-extrabold uppercase tracking-widest">
+                          Total BTC Solved & Distributed
+                        </span>
                       </div>
-                      <div className="text-3xl font-bold mb-2 font-mono tracking-tight text-white">2.59242 BTC</div>
-                      <div className="text-base text-[#F97316] font-extrabold mb-6">≈ $172,500.00 USD</div>
-                      
-                      {/* Bars chart */}
-                      <div className="h-16 flex items-end gap-2 mb-6">
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '30%' }}></div>
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '45%' }}></div>
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '35%' }}></div>
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '60%' }}></div>
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '50%' }}></div>
-                        <div className="flex-1 bg-[#F97316] rounded-t-sm" style={{ height: '85%' }}></div>
-                        <div className="flex-1 bg-[#F97316]/30 rounded-t-sm" style={{ height: '70%' }}></div>
-                        <div className="flex-1 bg-[#F97316] rounded-t-sm" style={{ height: '90%' }}></div>
+                      <div className="p-4 text-center">
+                        <span className="block text-2xl sm:text-3.5xl font-extrabold text-white tracking-tight leading-none mb-2 font-mono text-emerald-400">
+                          99.98%
+                        </span>
+                        <span className="block text-[10px] text-neutral-500 font-extrabold uppercase tracking-widest">
+                          Operations Uptime Audit
+                        </span>
                       </div>
-                      <div className="flex justify-between text-xs opacity-60 font-medium">
-                        <span>Throughput: 98.4%</span>
-                        <span>Status: Mining Active</span>
+                      <div className="p-4 text-center">
+                        <span className="block text-2xl sm:text-3.5xl font-extrabold text-white tracking-tight leading-none mb-2 font-mono">
+                          48,229
+                        </span>
+                        <span className="block text-[10px] text-neutral-500 font-extrabold uppercase tracking-widest">
+                          Active Mining Rigs
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -812,77 +889,240 @@ export default function App() {
                 </div>
               </section>
 
-              {/* STATS BAR SUMMARY (4 Cards template specs conforming to Design HTML) */}
-              <section className="bg-white border-y border-[#E7E7E4] py-10 sm:py-16">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-8">
-                  
-                  {/* Card 1 */}
-                  <div className="text-center">
-                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">182,540+</span>
-                    <span className="block text-xs text-[#6B7280] font-bold uppercase tracking-widest">Active Miners</span>
-                  </div>
+              {/* SOCIAL PROOF SCROLLING TICKER */}
+              <div className="bg-[#0A0C11] border-b border-[#1C212E]/80 py-4 overflow-hidden relative z-20">
+                <div className="flex whitespace-nowrap animate-[marquee_50s_linear_infinite] gap-12 items-center">
+                  {[
+                    { user: 'John D.', country: '🇺🇸 USA', amount: '0.0045 BTC', time: '1 min ago' },
+                    { user: 'Aisha K.', country: '🇳🇬 Nigeria', amount: '0.0128 BTC', time: '2 mins ago' },
+                    { user: 'Hiroshi M.', country: '🇯🇵 Japan', amount: '0.0094 BTC', time: '5 mins ago' },
+                    { user: 'Mateo S.', country: '🇪🇸 Spain', amount: '0.0210 BTC', time: '7 mins ago' },
+                    { user: 'Elena B.', country: '🇨🇦 Canada', amount: '0.0035 BTC', time: '9 mins ago' },
+                    { user: 'David W.', country: '🇬🇧 United Kingdom', amount: '0.0155 BTC', time: '12 mins ago' },
+                    { user: 'Carlos P.', country: '🇧🇷 Brazil', amount: '0.0068 BTC', time: '15 mins ago' },
+                    { user: 'Amara C.', country: '🇿🇦 South Africa', amount: '0.0112 BTC', time: '18 mins ago' }
+                  ].concat([
+                    { user: 'John D.', country: '🇺🇸 USA', amount: '0.0045 BTC', time: '1 min ago' },
+                    { user: 'Aisha K.', country: '🇳🇬 Nigeria', amount: '0.0128 BTC', time: '2 mins ago' },
+                    { user: 'Hiroshi M.', country: '🇯🇵 Japan', amount: '0.0094 BTC', time: '5 mins ago' },
+                    { user: 'Mateo S.', country: '🇪🇸 Spain', amount: '0.0210 BTC', time: '7 mins ago' },
+                    { user: 'Elena B.', country: '🇨🇦 Canada', amount: '0.0035 BTC', time: '9 mins ago' },
+                    { user: 'David W.', country: '🇬🇧 United Kingdom', amount: '0.0155 BTC', time: '12 mins ago' },
+                    { user: 'Carlos P.', country: '🇧🇷 Brazil', amount: '0.0068 BTC', time: '15 mins ago' },
+                    { user: 'Amara C.', country: '🇿🇦 South Africa', amount: '0.0112 BTC', time: '18 mins ago' }
+                  ]).map((item, idx) => (
+                    <div key={idx} className="inline-flex items-center space-x-3 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span className="text-neutral-300 font-bold">{item.user} ({item.country})</span>
+                      <span className="text-neutral-500 font-medium">withdrew</span>
+                      <span className="text-[#F97316] font-mono font-bold text-sm bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">{item.amount}</span>
+                      <span className="text-neutral-500 text-[10px]">{item.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                  {/* Card 2 */}
-                  <div className="text-center border-l border-[#E7E7E4]">
-                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">14.28 BTC</span>
-                    <span className="block text-xs text-[#6B7280] font-bold uppercase tracking-widest">Mined Daily</span>
-                  </div>
+              {/* LIVE CONSOLE AND CLIENT PERFORMANCE SANDBOX */}
+              <section className="py-20 border-b border-[#1C212E]/80">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    
+                    {/* Live mining activity sandbox simulation */}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <span className="text-xs uppercase font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-3 py-1.5 rounded-md">Live Platform Activity</span>
+                        <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-white leading-tight">ASIC Cluster Proof Verification</h2>
+                        <p className="text-neutral-400 text-sm leading-relaxed">
+                          Watch block rewards and target mining proofs solved. Our cluster handles custom NOWPayments blockchain relays natively to optimize your miners' security daily.
+                        </p>
+                      </div>
 
-                  {/* Card 3 */}
-                  <div className="text-center border-l border-[#E7E7E4]">
-                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">428 PH/s</span>
-                    <span className="block text-xs text-[#6B7280] font-bold uppercase tracking-widest">Total Hash Rate</span>
-                  </div>
+                      {/* Mock Terminal console simulation */}
+                      <div className="bg-[#0C0E14] border border-[#252A36] rounded-2xl p-5 shadow-2xl relative overflow-hidden font-mono text-[11px] text-neutral-300">
+                        <div className="absolute top-0 right-0 left-0 bg-[#12161F]/60 border-b border-[#252A36] px-4 py-2.5 flex justify-between items-center">
+                          <div className="flex space-x-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                          </div>
+                          <span className="text-neutral-500 text-[10px] font-bold">ASIC-LOGS_CONSOLE_LIVE</span>
+                        </div>
+                        <div className="pt-8 space-y-2.5 max-h-[190px] overflow-hidden leading-relaxed">
+                          <p className="text-neutral-500">[INFO] Connecting active container cluster at London Level 27 (UK)...</p>
+                          <p className="text-emerald-400">● [SOLVED] Nonce validation match: 0xc18258b3a09e1</p>
+                          <p className="text-neutral-400">Node block reward distributed count: <span className="text-orange-500">0.00318290 BTC</span></p>
+                          <p className="text-neutral-500">[INFO] Platform state hash: 524 PH/s · Temperature: 54°C</p>
+                          <p className="text-emerald-400">● [SOLVED] Nonce validation match: 0xda20268abf021e</p>
+                          <p className="text-[#F97316] blink animate-pulse">● [MINING] Syncing with Supabase & NOWPayments secure vaults...</p>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Card 4 */}
-                  <div className="text-center border-l border-[#E7E7E4]">
-                    <span className="block text-3xl sm:text-4xl font-extrabold text-[#F97316] tracking-tight leading-none mb-2">5+ Years</span>
-                    <span className="block text-xs text-[#6B7280] font-bold uppercase tracking-widest">Operating History</span>
-                  </div>
+                    {/* FIVE STAR USER REVIEWS GRID WITH PIC UTILS */}
+                    <div className="grid grid-cols-1 gap-6">
+                      
+                      {/* Review 1 */}
+                      <div className="bg-[#0C0E14] border border-[#1C212E] p-6 rounded-2xl space-y-4 shadow-lg hover:border-[#F97316]/30 transition-all">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <img 
+                              src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80" 
+                              alt="Marcus T." 
+                              referrerPolicy="no-referrer"
+                              className="w-11 h-11 rounded-full object-cover border border-[#252A36]" 
+                            />
+                            <div>
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Marcus T.</h4>
+                              <span className="text-[10px] text-neutral-500 block mt-0.5">Miner Client since 2023 · USA</span>
+                            </div>
+                          </div>
+                          <div className="flex text-amber-500">
+                            {[...Array(5)].map((_, i) => <Star key={i} className="h-3 w-3 fill-amber-500 stroke-none" />)}
+                          </div>
+                        </div>
+                        <p className="text-sm text-neutral-400 leading-relaxed italic">
+                          "I was incredibly skeptical of cloud mining platforms, but the node rewards credit like clockwork. Increasing my contract term to a Pro hashing plan worked without hitch."
+                        </p>
+                      </div>
 
+                      {/* Review 2 */}
+                      <div className="bg-[#0C0E14] border border-[#1C212E] p-6 rounded-2xl space-y-4 shadow-lg hover:border-[#F97316]/30 transition-all">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <img 
+                              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80" 
+                              alt="Aisha K." 
+                              referrerPolicy="no-referrer"
+                              className="w-11 h-11 rounded-full object-cover border border-[#252A36]" 
+                            />
+                            <div>
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Aisha K.</h4>
+                              <span className="text-[10px] text-neutral-500 block mt-0.5">Active Hashing Client · Nigeria</span>
+                            </div>
+                          </div>
+                          <div className="flex text-amber-500">
+                            {[...Array(5)].map((_, i) => <Star key={i} className="h-3 w-3 fill-amber-500 stroke-none" />)}
+                          </div>
+                        </div>
+                        <p className="text-sm text-neutral-400 leading-relaxed italic">
+                          "Accrued wallet values cash out cleanly without early penalty. The setup process is remarkably simple and the custom sandbox credits allow you to test payouts fast."
+                        </p>
+                      </div>
+
+                    </div>
+
+                  </div>
                 </div>
               </section>
 
-              {/* HOW IT WORKS */}
-              <section className="py-20 bg-white">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-                  <div className="text-center space-y-2.5">
-                    <h2 className="text-3xl font-extrabold tracking-tight text-neutral-900">Watch mining start in seconds</h2>
-                    <p className="text-sm text-gray-400 max-w-md mx-auto font-medium">We managed the complex container infrastructure so you can purchase yields cleanly</p>
+              {/* WHY CHOOSE US SECTION / FEATURES */}
+              <section className="py-20 border-b border-[#1C212E]/80">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+                  <div className="text-center space-y-3.5">
+                    <span className="text-xs uppercase font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-3 py-1.5 rounded-md">Our Features</span>
+                    <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-white leading-none">Why Choose CryptoBTC Miner?</h2>
+                    <p className="text-neutral-400 text-sm max-w-xl mx-auto leading-relaxed">
+                      We operate a professional physical GPU and ASIC data facility. Skip the complex setups and secure your passive yields safely.
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl hover:border-[#F97316]/40 transition-all space-y-4">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-[#F97316]">
+                        <Cpu className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider">Premium ASIC Hardware</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Industry-best liquid-cooled Bitmain rigs. Constant structural maintenance ensures maximum efficiency ratios.
+                      </p>
+                    </div>
+
+                    <div className="bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl hover:border-[#F97316]/40 transition-all space-y-4">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                        <Zap className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider">Accrued rewards hourly</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Watch block hashes translate into valid wallet balances in real-time. Transparent ledger and zero hidden handling fees.
+                      </p>
+                    </div>
+
+                    <div className="bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl hover:border-[#F97316]/40 transition-all space-y-4">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <ShieldCheck className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider">Multi-Factor Security</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Secure 2FA authentication, permanent IP change tracking logs, and deep insulated wallet reserves.
+                      </p>
+                    </div>
+
+                    <div className="bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl hover:border-[#F97316]/40 transition-all space-y-4">
+                      <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                        <LineChart className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider">Scalable plans</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        From startup hashing targets to advanced mining contracts with customizable hash capacities and term selections.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* HOW IT WORKS SECTION */}
+              <section className="py-20 border-b border-[#1C212E]/80">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+                  <div className="text-center space-y-3.5">
+                    <span className="text-xs uppercase font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-3 py-1.5 rounded-md">Workflow</span>
+                    <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-white leading-none">How It Works</h2>
+                    <p className="text-neutral-400 text-sm max-w-md mx-auto">
+                      Earn active Bitcoin in 3 straightforward steps with absolutely zero technical overheads.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-10">
                     
                     {/* Step 1 */}
-                    <div className="bg-[#FAFAF9] rounded-2xl p-8 border border-gray-100 space-y-4">
-                      <div className="w-12 h-12 bg-orange-500 rounded-full text-white font-extrabold flex items-center justify-center shadow-xs">
-                        1
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900">Choose a Plan</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">
-                        Assess our clear mining tariffs or input custom hashing rates. Paid nodes start at 500 USDT with up to 180 days maturity terms.
+                    <div className="flex-1 bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl space-y-4 relative w-full hover:border-[#F97316]/40 transition-all">
+                      <span className="absolute -top-4 -left-4 w-10 h-10 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white font-extrabold flex items-center justify-center shadow-lg shadow-orange-500/20 text-sm">
+                        01
+                      </span>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider pt-2">Create Account</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Register standard details inside our triple-shielded user portal. Real-time verification is processed instantly to allocate user mining blocks.
                       </p>
+                    </div>
+
+                    {/* Animated Arrow 1 */}
+                    <div className="hidden md:flex items-center text-[#F97316] shrink-0">
+                      <ArrowRight className="h-6 w-6 animate-[pulse-ring_2s_infinite]" />
                     </div>
 
                     {/* Step 2 */}
-                    <div className="bg-[#FAFAF9] rounded-2xl p-8 border border-gray-100 space-y-4">
-                      <div className="w-12 h-12 bg-orange-500 rounded-full text-white font-extrabold flex items-center justify-center shadow-xs">
-                        2
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900">Deposit USDT</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">
-                        Transmit your coin payment using our secure NOWPayments invoice screens, or test easily using sandbox credits first.
+                    <div className="flex-1 bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl space-y-4 relative w-full hover:border-[#F97316]/40 transition-all">
+                      <span className="absolute -top-4 -left-4 w-10 h-10 rounded-xl bg-gradient-to-r from-[#F97316] to-amber-600 text-white font-extrabold flex items-center justify-center shadow-lg shadow-orange-500/20 text-sm">
+                        02
+                      </span>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider pt-2">Choose Plan & Deposit</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        Pick from starter to high-yield custom hashing schedules. Deposit standard USDT utilizing fast secure NOWPayments wallet portals.
                       </p>
                     </div>
 
+                    {/* Animated Arrow 2 */}
+                    <div className="hidden md:flex items-center text-[#F97316] shrink-0">
+                      <ArrowRight className="h-6 w-6 animate-[pulse-ring_2s_infinite]" />
+                    </div>
+
                     {/* Step 3 */}
-                    <div className="bg-[#FAFAF9] rounded-2xl p-8 border border-gray-100 space-y-4">
-                      <div className="w-12 h-12 bg-orange-500 rounded-full text-white font-extrabold flex items-center justify-center shadow-xs">
-                        3
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900">Earn Daily</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">
-                        Watch block rewards credit to balances incrementally every 2 minutes. Cash out accrued balances to secure cold storage safely.
+                    <div className="flex-1 bg-[#0C0E14] border border-[#1C212E] p-8 rounded-2xl space-y-4 relative w-full hover:border-[#F97316]/40 transition-all">
+                      <span className="absolute -top-4 -left-4 w-10 h-10 rounded-xl bg-gradient-to-r from-[#F97316] to-amber-600 text-white font-extrabold flex items-center justify-center shadow-lg shadow-orange-500/20 text-sm">
+                        03
+                      </span>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider pt-2">Earn Daily BTC</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        ASICs activate block validation rewards instantly. Accumulating yields credit straight to user balances with manual security checkouts.
                       </p>
                     </div>
 
@@ -890,13 +1130,39 @@ export default function App() {
                 </div>
               </section>
 
-              {/* PLANS SECTION (Dark canvas base) */}
-              <section id="plans" className="py-20 bg-[#1A1A1A] text-white">
+              {/* SECURITY ASSURANCES DETAIL */}
+              <section className="py-20 border-b border-[#1C212E]/80 bg-[#0A0C11]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="bg-gradient-to-r from-orange-950/40 to-[#0C0E14] border border-[#1C212E] rounded-3xl p-8 sm:p-14 flex flex-col lg:flex-row items-center justify-between gap-10">
+                    <div className="space-y-4 max-w-xl">
+                      <span className="text-[10px] uppercase font-mono font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-2.5 py-1 rounded">Secured Environment</span>
+                      <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">Institutional Cold Storage Isolation</h2>
+                      <p className="text-neutral-400 text-sm leading-relaxed">
+                        We custody client payouts inside high-grade physical multisig cold vaults. All incoming funds are tracked by automated risk tools to shield user mining assets from server interference.
+                      </p>
+                    </div>
+                    <div className="w-full lg:w-auto shrink-0 bg-[#12161F]/85 border border-[#252A36] p-6 rounded-2xl text-center space-y-4 max-w-xs mx-auto lg:mx-0">
+                      <div className="w-14 h-14 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 mx-auto">
+                        <ShieldCheck className="h-7 w-7" />
+                      </div>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Triple-Shield Verification</h4>
+                      <p className="text-[11px] text-neutral-500 leading-normal">
+                        Every system payout mandates distinct isolated database handshakes to prevent compromise.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* MINING PLANS SECTION */}
+              <section id="plans" className="py-20 border-b border-[#1C212E]/80">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
                   <div className="text-center space-y-3.5">
-                    <span className="text-xs uppercase font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-3 py-1.5 rounded-md">Simple packages</span>
-                    <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-white leading-none">Simple, transparent pricing</h2>
-                    <p className="text-sm text-neutral-400 max-w-sm mx-auto">No hidden block electricity surcharges. Watch specifications simply.</p>
+                    <span className="text-xs uppercase font-extrabold tracking-widest text-[#F97316] bg-orange-500/10 px-3 py-1.5 rounded-md">Live Pricing</span>
+                    <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight text-white leading-none">Pick Your Hashing Contract</h2>
+                    <p className="text-sm text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                      Zero hidden block maintenance surcharges. Transparent tariffs clearly detailed below.
+                    </p>
                   </div>
 
                   {plans.length > 0 ? (
@@ -916,68 +1182,37 @@ export default function App() {
                 </div>
               </section>
 
-              {/* TESTIMONIALS */}
-              <section className="py-20 bg-white">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-                  <div className="text-center space-y-2">
-                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Miner Opinions</h2>
-                    <p className="text-sm text-gray-400 max-w-sm mx-auto font-medium">Over 182k miners worldwide trust our cloud cluster execution</p>
+              {/* PARTNERS SECTION */}
+              <section className="py-16 border-b border-[#1C212E]/80 bg-[#0A0C11]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+                  <div className="text-center">
+                    <span className="text-[10px] text-neutral-500 font-extrabold uppercase tracking-widest block mb-1">Ecosystem Relationship network</span>
+                    <h3 className="text-base font-bold text-neutral-400 uppercase tracking-widest">Our Global Strategic Partners</h3>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-                    
-                    {/* Testimonial 1 */}
-                    <div className="p-6 rounded-2xl border border-gray-100 space-y-4">
-                      <div className="flex text-amber-500 space-x-0.5">
-                        {[...Array(5)].map((_, i) => <span key={i} className="text-lg">★</span>)}
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-6 items-center text-center">
+                    {[
+                      { name: 'BITMAIN', logo: '⛏️' },
+                      { name: 'BINANCE API', logo: '🔶' },
+                      { name: 'NICEHASH', logo: '⭐' },
+                      { name: 'COINBASE PRO', logo: '🔵' },
+                      { name: 'F2POOL', logo: '⚡' },
+                      { name: 'ANTPOOL', logo: '🔗' }
+                    ].map((partner, idx) => (
+                      <div key={idx} className="bg-[#12161F]/40 border border-[#1C212E]/70 rounded-xl py-5 px-4 flex flex-col items-center justify-center space-y-2 hover:border-[#F97316]/30 hover:bg-[#12161F]/80 transition-all cursor-crosshair">
+                        <span className="text-2xl">{partner.logo}</span>
+                        <span className="text-[10px] font-black text-neutral-400 font-sans tracking-widest block uppercase">{partner.name}</span>
                       </div>
-                      <p className="text-sm text-gray-600 leading-relaxed italic font-medium">
-                        "I was skeptical of cloud services at first, but CryptoBTC node logs clear without hitch. Upgrading to Pro scaled my daily dividend payout. Highly satisfied!"
-                      </p>
-                      <div>
-                        <strong className="block text-sm text-gray-950">Marcus T.</strong>
-                        <span className="text-[10px] text-gray-400 block mt-0.5">Miner member since 2023</span>
-                      </div>
-                    </div>
-
-                    {/* Testimonial 2 */}
-                    <div className="p-6 rounded-2xl border border-gray-100 space-y-4">
-                      <div className="flex text-amber-500 space-x-0.5">
-                        {[...Array(5)].map((_, i) => <span key={i} className="text-lg">★</span>)}
-                      </div>
-                      <p className="text-sm text-gray-600 leading-relaxed italic font-medium">
-                        "Referral bonuses are credited instantly. Copying the sign-up URL with my colleagues earned me a nice BTC payout, highly recommend Pro plan!"
-                      </p>
-                      <div>
-                        <strong className="block text-sm text-gray-950">Aisha K.</strong>
-                        <span className="text-[10px] text-gray-400 block mt-0.5">Pro Plan member</span>
-                      </div>
-                    </div>
-
-                    {/* Testimonial 3 */}
-                    <div className="p-6 rounded-2xl border border-gray-100 space-y-4">
-                      <div className="flex text-amber-500 space-x-0.5">
-                        {[...Array(5)].map((_, i) => <span key={i} className="text-lg">★</span>)}
-                      </div>
-                      <p className="text-sm text-gray-600 leading-relaxed italic font-medium">
-                        "Our VIP mining contract provides exceptional BTC daily payouts. Security, and payouts are smooth. Professional grade team."
-                      </p>
-                      <div>
-                        <strong className="block text-sm text-gray-950">Diego R.</strong>
-                        <span className="text-[10px] text-gray-400 block mt-0.5">VIP investor</span>
-                      </div>
-                    </div>
-
+                    ))}
                   </div>
                 </div>
               </section>
 
               {/* FAQ SECTION Accordion */}
-              <section id="faq" className="py-20 bg-gray-50/50 border-t border-gray-105">
+              <section id="faq" className="py-20 border-b border-[#1C212E]/80">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
                   <div className="text-center space-y-2">
-                    <h2 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Frequently Answered Queries</h2>
-                    <p className="text-sm text-gray-400">Get assistance with operational terms and withdrawals</p>
+                    <h2 className="text-3xl font-extrabold text-white tracking-tight">Frequently Answered Queries</h2>
+                    <p className="text-sm text-neutral-400">Get instant clarification on operational terms and withdrawals</p>
                   </div>
 
                   <div className="space-y-4">
@@ -988,16 +1223,16 @@ export default function App() {
                     ].map((item, index) => {
                       const isOpen = landingFaqIndex === index;
                       return (
-                        <div key={index} className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:bg-orange-500/[0.015] hover:border-orange-500/20 transition-all duration-200">
+                        <div key={index} className="bg-[#0C0E14] border border-[#1C212E] rounded-2xl overflow-hidden hover:bg-[#12161F] hover:border-[#F97316]/20 transition-all duration-200">
                           <button
                             onClick={() => setLandingFaqIndex(isOpen ? null : index)}
-                            className="w-full text-left p-5 text-sm font-bold text-gray-950 flex justify-between items-center cursor-pointer"
+                            className="w-full text-left p-5 text-sm font-bold text-white flex justify-between items-center cursor-pointer"
                           >
-                             <span>{item.q}</span>
-                            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                            <span>{item.q}</span>
+                            <ChevronDown className={`h-4 w-4 text-[#F97316] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                           </button>
                           {isOpen && (
-                            <div className="px-5 pb-5 pt-1 text-xs text-gray-500 leading-relaxed font-semibold">
+                            <div className="px-5 pb-5 pt-1 text-xs text-neutral-400 leading-relaxed font-semibold">
                               {item.a}
                             </div>
                           )}
@@ -1009,15 +1244,18 @@ export default function App() {
               </section>
 
               {/* CTA BANNER */}
-              <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="bg-[#1C1917] rounded-3xl p-8 sm:p-16 text-center text-white space-y-6 border border-neutral-800 shadow-xl relative overflow-hidden">
-                  <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Start earning Bitcoin today</h2>
-                  <p className="text-sm text-neutral-400 max-w-md mx-auto">Register in minutes, deposit securely, and launch active block hashing nodes instantly.</p>
+              <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 relative">
+                <div className="bg-gradient-to-r from-orange-950/40 via-neutral-950 to-orange-950/20 rounded-3xl p-8 sm:p-16 text-center text-white space-y-6 border border-[#1C212E] shadow-2xl relative overflow-hidden">
+                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-orange-500/10 via-transparent to-transparent opacity-70" />
+                  <h2 className="text-3.5xl sm:text-5xl font-black tracking-tight leading-none text-white">Start earning Bitcoin today</h2>
+                  <p className="text-sm text-neutral-400 max-w-md mx-auto leading-relaxed">
+                    Register in minutes, deposit securely, and launch active block hashing nodes instantly. Join the top crypto yields portal now.
+                  </p>
                   <button
                     onClick={() => setCurrentPage('register')}
-                    className="inline-flex px-8 py-3.5 rounded-full bg-[#F97316] hover:bg-[#EA580C] font-bold text-white shadow-xs hover:shadow-md transition-all cursor-pointer text-center"
+                    className="inline-flex px-8 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 font-bold text-sm text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 transition-all cursor-pointer text-center"
                   >
-                    Create free account
+                    Create Free Account
                   </button>
                 </div>
               </section>
