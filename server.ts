@@ -307,7 +307,7 @@ async function startServer() {
     const expiryTime = new Date(user.plan_expires_at).getTime();
     const lastTime = new Date(user.last_mining_at).getTime();
 
-    if (lastTime >= expiryTime) {
+    if (lastTime >= expiryTime && now >= expiryTime) {
       // Plan has expired already
       const planName = user.active_plan === 'plan_starter' ? 'Starter Plan' : user.active_plan === 'plan_pro' ? 'Pro Plan' : 'VIP Plan';
       user.active_plan = null;

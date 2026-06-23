@@ -189,14 +189,27 @@ class Database {
             if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
               unified.is_suspended = false;
             }
+
+            const local = this.data.profiles.find(lp => lp.id === unified.id);
+
+            const active_plan = unified.active_plan !== undefined ? (unified.active_plan ?? null) : (local?.active_plan ?? null);
+            const plan_activated_at = unified.plan_activated_at !== undefined ? (unified.plan_activated_at ?? null) : (local?.plan_activated_at ?? null);
+            const plan_expires_at = unified.plan_expires_at !== undefined ? (unified.plan_expires_at ?? null) : (local?.plan_expires_at ?? null);
+            const last_mining_at = unified.last_mining_at !== undefined ? (unified.last_mining_at ?? null) : (local?.last_mining_at ?? null);
+            const locked_capital = unified.locked_capital !== undefined ? (unified.locked_capital ?? 0) : (local?.locked_capital ?? 0);
+            const deposit_usd_value = unified.deposit_usd_value !== undefined ? (unified.deposit_usd_value ?? 0) : (local?.deposit_usd_value ?? 0);
+
+            // Requirement 4: Add a console.log for each user showing their active_plan value when loading from Supabase so we can verify in Render logs.
+            console.log(`[Supabase Load Profiles] User: ${unified.email || 'unknown'} | id: ${unified.id} | active_plan: ${active_plan} | From Supabase: ${unified.active_plan} | From Local db: ${local?.active_plan}`);
+
             return {
               ...unified,
-              active_plan: unified.active_plan || null,
-              plan_activated_at: unified.plan_activated_at || null,
-              plan_expires_at: unified.plan_expires_at || null,
-              last_mining_at: unified.last_mining_at || null,
-              locked_capital: unified.locked_capital || 0,
-              deposit_usd_value: unified.deposit_usd_value || 0,
+              active_plan,
+              plan_activated_at,
+              plan_expires_at,
+              last_mining_at,
+              locked_capital,
+              deposit_usd_value,
               settings: typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings
             };
           });
@@ -669,6 +682,15 @@ class Database {
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
         merged.is_suspended = false;
       }
+      
+      // Ensure these fields are explicitly defined/included
+      merged.active_plan = merged.active_plan ?? null;
+      merged.plan_activated_at = merged.plan_activated_at ?? null;
+      merged.plan_expires_at = merged.plan_expires_at ?? null;
+      merged.last_mining_at = merged.last_mining_at ?? null;
+      merged.locked_capital = merged.locked_capital ?? 0;
+      merged.deposit_usd_value = merged.deposit_usd_value ?? 0;
+
       this.data.profiles[idx] = merged;
       this.save();
       this.supabaseUpdate('profiles', merged, updated.id);

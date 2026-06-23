@@ -16,6 +16,8 @@ export interface Profile {
   plan_activated_at?: string;
   plan_expires_at?: string;
   last_mining_at?: string;
+  locked_capital?: number;
+  deposit_usd_value?: number;
   is_admin: boolean;
   is_suspended: boolean;
   referral_code: string;
