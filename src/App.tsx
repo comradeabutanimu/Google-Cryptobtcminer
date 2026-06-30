@@ -716,7 +716,7 @@ export default function App() {
       
       {/* GLOW TOP-RIGHT TOAST BANNER */}
       {alertText && (
-        <div className={`fixed top-5 right-5 z-100 flex items-center space-x-3 p-4 rounded-xl shadow-2xl border transition-all duration-300 transform translate-y-0 ${
+        <div className={`fixed top-5 right-5 z-[9999] flex items-center space-x-3 p-4 rounded-xl shadow-2xl border transition-all duration-300 transform translate-y-0 ${
           alertText.type === 'success' 
             ? 'bg-[#1C1917] border-emerald-500 text-white' 
             : 'bg-[#1C1917] border-rose-500 text-white'

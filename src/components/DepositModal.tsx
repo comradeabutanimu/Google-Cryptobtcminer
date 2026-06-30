@@ -112,6 +112,7 @@ export default function DepositModal({
   const [isSandbox, setIsSandbox] = useState<boolean>(true);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'confirmed' | 'failed'>('pending');
   const [copied, setCopied] = useState<boolean>(false);
+  const [showLocalToast, setShowLocalToast] = useState<boolean>(false);
 
   // Map parent component selected plan transitions
   useEffect(() => {
@@ -215,8 +216,10 @@ export default function DepositModal({
         document.body.removeChild(textArea);
       }
       setCopied(true);
+      setShowLocalToast(true);
       toast(`${selectedNetwork === 'eth' ? 'ETH' : selectedNetwork === 'btc' ? 'BTC' : 'USDT'} deposit wallet address copied to clipboard!`, 'success');
       setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setShowLocalToast(false), 2500);
     } catch (err) {
       console.error('Could not copy text: ', err);
       toast('Failed to copy automatically. Please select and copy manually.', 'error');
@@ -659,9 +662,16 @@ export default function DepositModal({
 
                   {/* Destination Wallet Address display */}
                   <div className="space-y-2 text-left">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                      Dedicated Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : selectedNetwork === 'eth' ? 'Ethereum ERC20' : selectedNetwork === 'btc' ? 'Bitcoin' : 'BSC BEP20'})
-                    </label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                        Dedicated Destination Address ({selectedNetwork === 'usdttrc20' ? 'TRON TRC20' : selectedNetwork === 'eth' ? 'Ethereum ERC20' : selectedNetwork === 'btc' ? 'Bitcoin' : 'BSC BEP20'})
+                      </label>
+                      {showLocalToast && (
+                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
+                          <Check className="h-3 w-3" /> Address Copied!
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <div 
                         onClick={copyToClipboard}
