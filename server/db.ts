@@ -95,6 +95,46 @@ class Database {
       notifications: [],
       announcements: DEFAULT_ANNOUNCEMENTS
     };
+
+    const staticColumns: { [key: string]: string[] } = {
+      profiles: [
+        'id', 'email', 'full_name', 'btc_balance', 'active_plan', 
+        'active_plan_investment', 'active_plan_hash_rate', 'active_plan_rate', 
+        'plan_activated_at', 'plan_expires_at', 'last_mining_at', 
+        'is_admin', 'is_suspended', 'referral_code', 'referred_by', 
+        'admin_note', 'settings', 'two_factor_enabled', 'two_factor_secret', 
+        'known_ips', 'created_at', 'passwordhash', 'password_hash'
+      ],
+      plans: [
+        'id', 'name', 'price_btc', 'hash_rate', 'daily_earn_btc', 
+        'duration_days', 'is_active', 'created_at'
+      ],
+      transactions: [
+        'id', 'user_id', 'type', 'description', 'amount_btc', 'status', 'created_at'
+      ],
+      deposits: [
+        'id', 'user_id', 'amount_usd', 'amount_btc', 'invoice_id', 
+        'nowpayments_payment_id', 'status', 'created_at'
+      ],
+      withdrawals: [
+        'id', 'user_id', 'amount_btc', 'wallet_address', 'status', 
+        'actioned_by', 'actioned_at', 'created_at'
+      ],
+      activity_logs: [
+        'id', 'user_id', 'action', 'details', 'created_at'
+      ],
+      notifications: [
+        'id', 'user_id', 'message', 'is_read', 'created_at'
+      ],
+      announcements: [
+        'id', 'message', 'is_active', 'created_at'
+      ]
+    };
+
+    for (const [table, cols] of Object.entries(staticColumns)) {
+      this.tableColumns.set(table, new Set<string>(cols));
+    }
+
     this.init();
     this.bootstrapSupabase();
   }
@@ -176,48 +216,82 @@ class Database {
       const { data: profiles, error: pError } = await this.supabaseClient.from('profiles').select('*');
       if (!pError && profiles) {
         this.availableTables.add('profiles');
-        if (profiles.length > 0) {
-          this.data.profiles = profiles.map(p => {
-            const unified = { ...p };
-            // Auto map lowercased passwordhash or password_hash back to camelCase passwordHash for authentication security checks
-            if (!unified.passwordHash && unified.passwordhash) {
-              unified.passwordHash = unified.passwordhash;
-            }
-            if (!unified.passwordHash && unified.password_hash) {
-              unified.passwordHash = unified.password_hash;
-            }
-            if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
-              unified.is_suspended = false;
-            }
-
-            const local = this.data.profiles.find(lp => lp.id === unified.id);
-
-            const active_plan = unified.active_plan !== undefined ? (unified.active_plan ?? null) : (local?.active_plan ?? null);
-            const plan_activated_at = unified.plan_activated_at !== undefined ? (unified.plan_activated_at ?? null) : (local?.plan_activated_at ?? null);
-            const plan_expires_at = unified.plan_expires_at !== undefined ? (unified.plan_expires_at ?? null) : (local?.plan_expires_at ?? null);
-            const last_mining_at = unified.last_mining_at !== undefined ? (unified.last_mining_at ?? null) : (local?.last_mining_at ?? null);
-            const locked_capital = unified.locked_capital !== undefined ? (unified.locked_capital ?? 0) : (local?.locked_capital ?? 0);
-            const deposit_usd_value = unified.deposit_usd_value !== undefined ? (unified.deposit_usd_value ?? 0) : (local?.deposit_usd_value ?? 0);
-
-            // Requirement 4: Add a console.log for each user showing their active_plan value when loading from Supabase so we can verify in Render logs.
-            console.log(`[Supabase Load Profiles] User: ${unified.email || 'unknown'} | id: ${unified.id} | active_plan: ${active_plan} | From Supabase: ${unified.active_plan} | From Local db: ${local?.active_plan}`);
-
-            return {
-              ...unified,
-              active_plan,
-              plan_activated_at,
-              plan_expires_at,
-              last_mining_at,
-              locked_capital,
-              deposit_usd_value,
-              settings: typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings
-            };
-          });
-          console.log(`Loaded ${profiles.length} profiles from Supabase.`);
-        } else {
-          if (this.data.profiles.length > 0) {
-            await this.syncTableToSupabase('profiles', this.data.profiles);
+        
+        const mergedProfiles = profiles.map(p => {
+          const unified = { ...p };
+          // Auto map lowercased passwordhash or password_hash back to camelCase passwordHash for authentication security checks
+          if (!unified.passwordHash && unified.passwordhash) {
+            unified.passwordHash = unified.passwordhash;
           }
+          if (!unified.passwordHash && unified.password_hash) {
+            unified.passwordHash = unified.password_hash;
+          }
+          if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+            unified.is_suspended = false;
+          }
+
+          const local = this.data.profiles.find(lp => lp.id === unified.id);
+
+          // Deep merge: Prefer whichever is non-null and non-default/zero
+          const active_plan = (unified.active_plan !== undefined && unified.active_plan !== null) ? unified.active_plan : (local?.active_plan ?? null);
+          const plan_activated_at = (unified.plan_activated_at !== undefined && unified.plan_activated_at !== null) ? unified.plan_activated_at : (local?.plan_activated_at ?? null);
+          const plan_expires_at = (unified.plan_expires_at !== undefined && unified.plan_expires_at !== null) ? unified.plan_expires_at : (local?.plan_expires_at ?? null);
+          const last_mining_at = (unified.last_mining_at !== undefined && unified.last_mining_at !== null) ? unified.last_mining_at : (local?.last_mining_at ?? null);
+          const locked_capital = (unified.locked_capital !== undefined && unified.locked_capital !== null && unified.locked_capital !== 0) ? unified.locked_capital : (local?.locked_capital ?? 0);
+          const deposit_usd_value = (unified.deposit_usd_value !== undefined && unified.deposit_usd_value !== null && unified.deposit_usd_value !== 0) ? unified.deposit_usd_value : (local?.deposit_usd_value ?? 0);
+          
+          const active_plan_investment = (unified.active_plan_investment !== undefined && unified.active_plan_investment !== null && unified.active_plan_investment !== 0) ? unified.active_plan_investment : (local?.active_plan_investment ?? 0);
+          const active_plan_hash_rate = (unified.active_plan_hash_rate !== undefined && unified.active_plan_hash_rate !== null && unified.active_plan_hash_rate !== 0) ? unified.active_plan_hash_rate : (local?.active_plan_hash_rate ?? 0);
+          const active_plan_rate = (unified.active_plan_rate !== undefined && unified.active_plan_rate !== null && unified.active_plan_rate !== 0) ? unified.active_plan_rate : (local?.active_plan_rate ?? 0);
+
+          let settingsObj = local?.settings || {
+            blurBalances: false,
+            notifyDepositConfirm: true,
+            notifyWithdrawUpdate: true,
+            notifySecurityAlert: true,
+            notifyPromotions: false
+          };
+          if (unified.settings) {
+            try {
+              settingsObj = typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings;
+            } catch (e) {
+              console.warn('Failed parsing settings for ' + unified.email);
+            }
+          }
+
+          const btc_balance = (unified.btc_balance !== undefined && unified.btc_balance !== null && (unified.btc_balance > 0 || !local)) ? unified.btc_balance : (local?.btc_balance ?? 0);
+
+          // Requirement 4: Add a console.log for each user showing their active_plan value when loading from Supabase so we can verify in Render logs.
+          console.log(`[Supabase Load Profiles] User: ${unified.email || 'unknown'} | id: ${unified.id} | active_plan: ${active_plan} | From Supabase: ${unified.active_plan} | From Local db: ${local?.active_plan}`);
+
+          return {
+            ...local,
+            ...unified,
+            active_plan,
+            active_plan_investment,
+            active_plan_hash_rate,
+            active_plan_rate,
+            plan_activated_at,
+            plan_expires_at,
+            last_mining_at,
+            locked_capital,
+            deposit_usd_value,
+            btc_balance,
+            settings: settingsObj
+          } as any;
+        });
+
+        // Combine any local-only profiles that are not registered in Supabase yet
+        const localProfilesNotInSupabase = this.data.profiles.filter(lp => !profiles.some(sp => sp.id === lp.id));
+        this.data.profiles = [
+          ...mergedProfiles,
+          ...localProfilesNotInSupabase
+        ];
+
+        console.log(`Loaded ${profiles.length} profiles from Supabase. Total combined local: ${this.data.profiles.length}`);
+        if (localProfilesNotInSupabase.length > 0) {
+          console.log(`Discovered ${localProfilesNotInSupabase.length} local-only profiles. Sycing to Supabase...`);
+          await this.syncTableToSupabase('profiles', localProfilesNotInSupabase);
         }
       } else if (pError) {
         if (pError.message.includes('Could not find the table') || pError.message.includes('relation "')) {
@@ -251,11 +325,14 @@ class Database {
       const { data: txs, error: txError } = await this.supabaseClient.from('transactions').select('*');
       if (!txError && txs) {
         this.availableTables.add('transactions');
-        if (txs.length > 0) {
-          this.data.transactions = txs;
-          console.log(`Loaded ${txs.length} transactions from Supabase.`);
-        } else if (this.data.transactions.length > 0) {
-          await this.syncTableToSupabase('transactions', this.data.transactions);
+        const localTxsNotInSupabase = this.data.transactions.filter(ltx => !txs.some(stx => stx.id === ltx.id));
+        this.data.transactions = [
+          ...txs,
+          ...localTxsNotInSupabase
+        ];
+        console.log(`Loaded ${txs.length} transactions from Supabase. Total combined local: ${this.data.transactions.length}`);
+        if (localTxsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('transactions', localTxsNotInSupabase);
         }
       } else if (txError) {
         if (txError.message.includes('Could not find the table') || txError.message.includes('relation "')) {
@@ -269,11 +346,14 @@ class Database {
       const { data: deposits, error: depError } = await this.supabaseClient.from('deposits').select('*');
       if (!depError && deposits) {
         this.availableTables.add('deposits');
-        if (deposits.length > 0) {
-          this.data.deposits = deposits;
-          console.log(`Loaded ${deposits.length} deposits from Supabase.`);
-        } else if (this.data.deposits.length > 0) {
-          await this.syncTableToSupabase('deposits', this.data.deposits);
+        const localDepositsNotInSupabase = this.data.deposits.filter(ldep => !deposits.some(sdep => sdep.id === ldep.id));
+        this.data.deposits = [
+          ...deposits,
+          ...localDepositsNotInSupabase
+        ];
+        console.log(`Loaded ${deposits.length} deposits from Supabase. Total combined local: ${this.data.deposits.length}`);
+        if (localDepositsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('deposits', localDepositsNotInSupabase);
         }
       } else if (depError) {
         if (depError.message.includes('Could not find the table') || depError.message.includes('relation "')) {
@@ -287,11 +367,14 @@ class Database {
       const { data: withdrawals, error: wdError } = await this.supabaseClient.from('withdrawals').select('*');
       if (!wdError && withdrawals) {
         this.availableTables.add('withdrawals');
-        if (withdrawals.length > 0) {
-          this.data.withdrawals = withdrawals;
-          console.log(`Loaded ${withdrawals.length} withdrawals from Supabase.`);
-        } else if (this.data.withdrawals.length > 0) {
-          await this.syncTableToSupabase('withdrawals', this.data.withdrawals);
+        const localWdsNotInSupabase = this.data.withdrawals.filter(lwd => !withdrawals.some(swd => swd.id === lwd.id));
+        this.data.withdrawals = [
+          ...withdrawals,
+          ...localWdsNotInSupabase
+        ];
+        console.log(`Loaded ${withdrawals.length} withdrawals from Supabase. Total combined local: ${this.data.withdrawals.length}`);
+        if (localWdsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('withdrawals', localWdsNotInSupabase);
         }
       } else if (wdError) {
         if (wdError.message.includes('Could not find the table') || wdError.message.includes('relation "')) {
@@ -305,11 +388,14 @@ class Database {
       const { data: logs, error: lError } = await this.supabaseClient.from('activity_logs').select('*');
       if (!lError && logs) {
         this.availableTables.add('activity_logs');
-        if (logs.length > 0) {
-          this.data.activity_logs = logs;
-          console.log(`Loaded ${logs.length} activity_logs from Supabase.`);
-        } else if (this.data.activity_logs.length > 0) {
-          await this.syncTableToSupabase('activity_logs', this.data.activity_logs);
+        const localLogsNotInSupabase = this.data.activity_logs.filter(llog => !logs.some(slog => slog.id === llog.id));
+        this.data.activity_logs = [
+          ...logs,
+          ...localLogsNotInSupabase
+        ];
+        console.log(`Loaded ${logs.length} activity_logs from Supabase. Total combined local: ${this.data.activity_logs.length}`);
+        if (localLogsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('activity_logs', localLogsNotInSupabase);
         }
       } else if (lError) {
         if (lError.message.includes('Could not find the table') || lError.message.includes('relation "')) {
@@ -323,11 +409,14 @@ class Database {
       const { data: notifs, error: nError } = await this.supabaseClient.from('notifications').select('*');
       if (!nError && notifs) {
         this.availableTables.add('notifications');
-        if (notifs.length > 0) {
-          this.data.notifications = notifs;
-          console.log(`Loaded ${notifs.length} notifications from Supabase.`);
-        } else if (this.data.notifications.length > 0) {
-          await this.syncTableToSupabase('notifications', this.data.notifications);
+        const localNotifsNotInSupabase = this.data.notifications.filter(lnotif => !notifs.some(snotif => snotif.id === lnotif.id));
+        this.data.notifications = [
+          ...notifs,
+          ...localNotifsNotInSupabase
+        ];
+        console.log(`Loaded ${notifs.length} notifications from Supabase. Total combined local: ${this.data.notifications.length}`);
+        if (localNotifsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('notifications', localNotifsNotInSupabase);
         }
       } else if (nError) {
         if (nError.message.includes('Could not find the table') || nError.message.includes('relation "')) {
@@ -341,11 +430,14 @@ class Database {
       const { data: anns, error: annError } = await this.supabaseClient.from('announcements').select('*');
       if (!annError && anns) {
         this.availableTables.add('announcements');
-        if (anns.length > 0) {
-          this.data.announcements = anns;
-          console.log(`Loaded ${anns.length} announcements from Supabase.`);
-        } else {
-          await this.syncTableToSupabase('announcements', this.data.announcements);
+        const localAnnsNotInSupabase = this.data.announcements.filter(lann => !anns.some(sann => sann.id === lann.id));
+        this.data.announcements = [
+          ...anns,
+          ...localAnnsNotInSupabase
+        ];
+        console.log(`Loaded ${anns.length} announcements from Supabase. Total combined local: ${this.data.announcements.length}`);
+        if (localAnnsNotInSupabase.length > 0) {
+          await this.syncTableToSupabase('announcements', localAnnsNotInSupabase);
         }
       } else if (annError) {
         if (annError.message.includes('Could not find the table') || annError.message.includes('relation "')) {
@@ -671,13 +763,20 @@ class Database {
     this.supabaseInsert('announcements', ann);
   }
 
-  public updateProfile(updated: Profile) {
+  public updateProfile(updated: Partial<Profile> & { id: string }) {
     if (updated.email && updated.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
       updated.is_suspended = false;
     }
     const idx = this.data.profiles.findIndex(p => p.id === updated.id);
     if (idx !== -1) {
       const original = this.data.profiles[idx];
+      const changedFields: any = {};
+      for (const key of Object.keys(updated)) {
+        if ((updated as any)[key] !== (original as any)[key]) {
+          changedFields[key] = (updated as any)[key];
+        }
+      }
+
       const merged = { ...original, ...updated };
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
         merged.is_suspended = false;
@@ -693,16 +792,31 @@ class Database {
 
       this.data.profiles[idx] = merged;
       this.save();
-      this.supabaseUpdate('profiles', merged, updated.id);
+
+      if (Object.keys(changedFields).length > 0) {
+        this.supabaseUpdate('profiles', { id: updated.id, ...changedFields }, updated.id);
+      }
     }
   }
 
-  public updatePlan(updated: Plan) {
+  public updatePlan(updated: Partial<Plan> & { id: string }) {
     const idx = this.data.plans.findIndex(p => p.id === updated.id);
     if (idx !== -1) {
-      this.data.plans[idx] = updated;
+      const original = this.data.plans[idx];
+      const changedFields: any = {};
+      for (const key of Object.keys(updated)) {
+        if ((updated as any)[key] !== (original as any)[key]) {
+          changedFields[key] = (updated as any)[key];
+        }
+      }
+
+      const merged = { ...original, ...updated };
+      this.data.plans[idx] = merged;
       this.save();
-      this.supabaseUpdate('plans', updated, updated.id);
+
+      if (Object.keys(changedFields).length > 0) {
+        this.supabaseUpdate('plans', { id: updated.id, ...changedFields }, updated.id);
+      }
     }
   }
 
@@ -712,30 +826,66 @@ class Database {
     this.supabaseInsert('plans', plan);
   }
 
-  public updateWithdrawal(updated: Withdrawal) {
+  public updateWithdrawal(updated: Partial<Withdrawal> & { id: string }) {
     const idx = this.data.withdrawals.findIndex(w => w.id === updated.id);
     if (idx !== -1) {
-      this.data.withdrawals[idx] = updated;
+      const original = this.data.withdrawals[idx];
+      const changedFields: any = {};
+      for (const key of Object.keys(updated)) {
+        if ((updated as any)[key] !== (original as any)[key]) {
+          changedFields[key] = (updated as any)[key];
+        }
+      }
+
+      const merged = { ...original, ...updated };
+      this.data.withdrawals[idx] = merged;
       this.save();
-      this.supabaseUpdate('withdrawals', updated, updated.id);
+
+      if (Object.keys(changedFields).length > 0) {
+        this.supabaseUpdate('withdrawals', { id: updated.id, ...changedFields }, updated.id);
+      }
     }
   }
 
-  public updateDeposit(updated: Deposit) {
+  public updateDeposit(updated: Partial<Deposit> & { id: string }) {
     const idx = this.data.deposits.findIndex(d => d.id === updated.id);
     if (idx !== -1) {
-      this.data.deposits[idx] = updated;
+      const original = this.data.deposits[idx];
+      const changedFields: any = {};
+      for (const key of Object.keys(updated)) {
+        if ((updated as any)[key] !== (original as any)[key]) {
+          changedFields[key] = (updated as any)[key];
+        }
+      }
+
+      const merged = { ...original, ...updated };
+      this.data.deposits[idx] = merged;
       this.save();
-      this.supabaseUpdate('deposits', updated, updated.id);
+
+      if (Object.keys(changedFields).length > 0) {
+        this.supabaseUpdate('deposits', { id: updated.id, ...changedFields }, updated.id);
+      }
     }
   }
 
-  public updateAnnouncement(updated: Announcement) {
+  public updateAnnouncement(updated: Partial<Announcement> & { id: string }) {
     const idx = this.data.announcements.findIndex(a => a.id === updated.id);
     if (idx !== -1) {
-      this.data.announcements[idx] = updated;
+      const original = this.data.announcements[idx];
+      const changedFields: any = {};
+      for (const key of Object.keys(updated)) {
+        if ((updated as any)[key] !== (original as any)[key]) {
+          changedFields[key] = (updated as any)[key];
+        }
+      }
+
+      const merged = { ...original, ...updated };
+      this.data.announcements[idx] = merged;
       this.save();
-      this.supabaseUpdate('announcements', updated, updated.id);
+
+      if (Object.keys(changedFields).length > 0) {
+        this.supabaseUpdate('announcements', { id: updated.id, ...changedFields }, updated.id);
+      }
     }
   }
 
