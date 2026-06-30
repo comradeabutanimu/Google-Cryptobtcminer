@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Upload, HelpCircle, ShieldAlert } from 'lucide-react';
+import { Upload, HelpCircle, ShieldAlert, X, AlertTriangle } from 'lucide-react';
 import { Profile } from '../types.js';
 import { api } from '../lib/api.js';
 
@@ -18,16 +18,21 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isChecked, setIsChecked] = useState(false);
 
   const maxWithdraw = profile.btc_balance;
   const minWithdraw = 0.0001;
 
-  const handleWithdraw = async (e: React.FormEvent) => {
+  const handleWithdrawAttempt = (e: React.FormEvent) => {
     e.preventDefault();
     
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt < minWithdraw) {
       return toast(`Minimum withdrawal amount is ${minWithdraw} BTC.`, 'error');
+    }
+    if (amt <= 0.00005) {
+      return toast('Amount must be greater than the network fee of 0.00005 BTC.', 'error');
     }
     if (amt > maxWithdraw) {
       return toast('Insufficient BTC balance available.', 'error');
@@ -35,6 +40,13 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
     if (address.trim().length < 10) {
       return toast('Please submit a valid Bitcoin wallet address.', 'error');
     }
+
+    setShowConfirm(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (!isChecked) return;
+    const amt = parseFloat(amount);
 
     setLoading(true);
     try {
@@ -47,6 +59,8 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
         toast(`Withdrawal request for ${amt} BTC submitted successfully for admin review!`, 'success');
         setAmount('');
         setAddress('');
+        setShowConfirm(false);
+        setIsChecked(false);
       }
     } catch (err: any) {
       toast(err.message || 'Failed to submit withdrawal request.', 'error');
@@ -78,7 +92,7 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
       </div>
 
       {/* Inputs Form */}
-      <form onSubmit={handleWithdraw} className="space-y-5">
+      <form onSubmit={handleWithdrawAttempt} className="space-y-5">
         
         {/* Destination Wallet Address */}
         <div className="space-y-1.5">
@@ -140,17 +154,125 @@ export default function Withdraw({ profile, onWithdrawRequested, toast }: Withdr
           disabled={loading || !amount || !address}
           className="w-full bg-[#F97316] hover:bg-[#EA580C] text-white font-bold py-3.5 px-4 rounded-xl cursor-pointer shadow-xs hover:shadow-md transition-all duration-150 text-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
         >
-          {loading ? (
-            <>
-              <LoaderIcon />
-              <span>Processing Withdraw Request...</span>
-            </>
-          ) : (
-            <span>Request Withdrawal</span>
-          )}
+          <span>Request Withdrawal</span>
         </button>
 
       </form>
+
+      {/* Double-Confirmation Modal */}
+      {showConfirm && (
+        <div id="withdraw-confirm-modal" className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden border border-gray-100 flex flex-col p-6 space-y-6">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-start">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Confirm Your Cash-out</h3>
+                  <p className="text-xs text-gray-400">Please double-check your withdrawal parameters</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirm(false);
+                  setIsChecked(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-xl cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body / Information */}
+            <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-4 space-y-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Destination Wallet Address</span>
+                <span className="text-xs font-mono font-bold text-gray-800 break-all block mt-1 bg-white border border-gray-100 p-2.5 rounded-lg">
+                  {address}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Withdrawal Asset</span>
+                  <span className="text-sm font-semibold text-gray-800 block mt-0.5">Bitcoin (BTC)</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Transfer Network</span>
+                  <span className="text-sm font-semibold text-gray-800 block mt-0.5">BTC Native Network</span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-gray-200 pt-3 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Requested Amount:</span>
+                  <span className="font-mono font-semibold text-gray-800">{(parseFloat(amount) || 0).toFixed(8)} BTC</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Network Fee:</span>
+                  <span className="font-mono font-semibold text-amber-600">0.00005000 BTC</span>
+                </div>
+                <div className="flex justify-between text-xs border-t border-gray-200/50 pt-2 font-bold">
+                  <span className="text-gray-900">Net Disbursed:</span>
+                  <span className="font-mono text-emerald-600 text-sm">
+                    {Math.max(0, (parseFloat(amount) - 0.00005)).toFixed(8)} BTC
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification Checklist / Double-Confirmation */}
+            <div className="space-y-3">
+              <label className="flex items-start space-x-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="confirm-chk"
+                  checked={isChecked}
+                  onChange={(e) => setIsChecked(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer accent-orange-500"
+                />
+                <span className="text-xs text-gray-600 leading-snug">
+                  I double-confirm that the Bitcoin destination address is <strong>correct</strong> and belongs to me. I understand crypto transactions are completely irreversible.
+                </span>
+              </label>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirm(false);
+                  setIsChecked(false);
+                }}
+                className="w-1/3 border border-gray-200 hover:bg-gray-50 text-gray-500 font-bold py-3 rounded-xl cursor-pointer transition-colors text-xs text-center"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={loading || !isChecked}
+                onClick={handleConfirmSubmit}
+                className="w-2/3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-all text-xs text-center flex items-center justify-center space-x-2"
+              >
+                {loading ? (
+                  <>
+                    <LoaderIcon />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Withdraw</span>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

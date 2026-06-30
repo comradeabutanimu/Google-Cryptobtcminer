@@ -3,8 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/png" href="/src/assets/images/favicon_1779933297334.png" />
+    <link class="favicon" rel="icon" type="image/png" href="/src/assets/images/favicon_1779933297334.png" />
     <title>CryptoBTC Miner | Cloud Mining Platform</title>
+    <script type="text/javascript">
+      // Suppress known third-party Tawk.to WebSocket/getForm errors in sandbox/iframe context
+      window.addEventListener('error', function(e) {
+        if (e && e.message) {
+          const msg = String(e.message).toLowerCase();
+          const url = String(e.filename || '').toLowerCase();
+          if (
+            msg.includes('tawk') || 
+            msg.includes('getform') || 
+            msg.includes('socket server') || 
+            url.includes('tawk.to')
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) {
+              e.stopImmediatePropagation();
+            }
+            return true;
+          }
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e && e.reason) {
+          const msg = String(e.reason.message || e.reason).toLowerCase();
+          if (
+            msg.includes('tawk') || 
+            msg.includes('getform') || 
+            msg.includes('socket server')
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) {
+              e.stopImmediatePropagation();
+            }
+            return true;
+          }
+        }
+      }, true);
+
+      // Suppress [Tawk/Form]: undefined undefined console errors
+      const originalConsoleError = console.error;
+      console.error = function(...args) {
+        const argStr = args.map(arg => String(arg)).join(' ');
+        if (
+          argStr.includes('[Tawk/Form]') || 
+          argStr.includes('Tawk_API') || 
+          argStr.includes('getForm') || 
+          argStr.includes('tawk.to')
+        ) {
+          return;
+        }
+        originalConsoleError.apply(console, args);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>
