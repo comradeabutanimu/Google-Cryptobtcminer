@@ -412,6 +412,14 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  console.log('[Startup] Synchronizing with database...');
+  try {
+    await db.bootstrapSupabase();
+    console.log('[Startup] Database synchronized.');
+  } catch (err: any) {
+    console.error('[Startup Error] Database synchronization failed:', err.message || err);
+  }
+
   app.use(express.json());
 
   // API CORS fallback (not strictly required since we proxy, but clean)

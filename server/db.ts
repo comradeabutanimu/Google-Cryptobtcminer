@@ -83,6 +83,7 @@ class Database {
   private supabaseClient = supabase;
   private availableTables = new Set<string>();
   private tableColumns = new Map<string, Set<string>>();
+  private bootstrapPromise: Promise<void> | null = null;
 
   constructor() {
     this.data = {
@@ -169,7 +170,6 @@ class Database {
       } else {
         this.save();
       }
-      this.ensureSuperAdmin();
     } catch (err) {
       console.error('Error initializing database file; failing back to in-memory.', err);
     }
@@ -181,8 +181,13 @@ class Database {
       return;
     }
 
-    console.log('Initiating bootstrap sync from Supabase...');
-    this.availableTables.clear();
+    if (this.bootstrapPromise) {
+      return this.bootstrapPromise;
+    }
+
+    this.bootstrapPromise = (async () => {
+      console.log('Initiating bootstrap sync from Supabase...');
+      this.availableTables.clear();
 
     try {
       if (supabaseUrl && supabaseKey) {
@@ -232,17 +237,17 @@ class Database {
 
           const local = this.data.profiles.find(lp => lp.id === unified.id);
 
-          // Deep merge: Prefer whichever is non-null and non-default/zero
-          const active_plan = (unified.active_plan !== undefined && unified.active_plan !== null) ? unified.active_plan : (local?.active_plan ?? null);
-          const plan_activated_at = (unified.plan_activated_at !== undefined && unified.plan_activated_at !== null) ? unified.plan_activated_at : (local?.plan_activated_at ?? null);
-          const plan_expires_at = (unified.plan_expires_at !== undefined && unified.plan_expires_at !== null) ? unified.plan_expires_at : (local?.plan_expires_at ?? null);
-          const last_mining_at = (unified.last_mining_at !== undefined && unified.last_mining_at !== null) ? unified.last_mining_at : (local?.last_mining_at ?? null);
-          const locked_capital = (unified.locked_capital !== undefined && unified.locked_capital !== null && unified.locked_capital !== 0) ? unified.locked_capital : (local?.locked_capital ?? 0);
-          const deposit_usd_value = (unified.deposit_usd_value !== undefined && unified.deposit_usd_value !== null && unified.deposit_usd_value !== 0) ? unified.deposit_usd_value : (local?.deposit_usd_value ?? 0);
+          // Deep merge: Prioritize Supabase as the absolute single source of truth
+          const active_plan = unified.active_plan !== undefined ? unified.active_plan : (local?.active_plan ?? null);
+          const plan_activated_at = unified.plan_activated_at !== undefined ? unified.plan_activated_at : (local?.plan_activated_at ?? null);
+          const plan_expires_at = unified.plan_expires_at !== undefined ? unified.plan_expires_at : (local?.plan_expires_at ?? null);
+          const last_mining_at = unified.last_mining_at !== undefined ? unified.last_mining_at : (local?.last_mining_at ?? null);
+          const locked_capital = unified.locked_capital !== undefined ? unified.locked_capital : (local?.locked_capital ?? 0);
+          const deposit_usd_value = unified.deposit_usd_value !== undefined ? unified.deposit_usd_value : (local?.deposit_usd_value ?? 0);
           
-          const active_plan_investment = (unified.active_plan_investment !== undefined && unified.active_plan_investment !== null && unified.active_plan_investment !== 0) ? unified.active_plan_investment : (local?.active_plan_investment ?? 0);
-          const active_plan_hash_rate = (unified.active_plan_hash_rate !== undefined && unified.active_plan_hash_rate !== null && unified.active_plan_hash_rate !== 0) ? unified.active_plan_hash_rate : (local?.active_plan_hash_rate ?? 0);
-          const active_plan_rate = (unified.active_plan_rate !== undefined && unified.active_plan_rate !== null && unified.active_plan_rate !== 0) ? unified.active_plan_rate : (local?.active_plan_rate ?? 0);
+          const active_plan_investment = unified.active_plan_investment !== undefined ? unified.active_plan_investment : (local?.active_plan_investment ?? 0);
+          const active_plan_hash_rate = unified.active_plan_hash_rate !== undefined ? unified.active_plan_hash_rate : (local?.active_plan_hash_rate ?? 0);
+          const active_plan_rate = unified.active_plan_rate !== undefined ? unified.active_plan_rate : (local?.active_plan_rate ?? 0);
 
           let settingsObj = local?.settings || {
             blurBalances: false,
@@ -259,7 +264,7 @@ class Database {
             }
           }
 
-          const btc_balance = (unified.btc_balance !== undefined && unified.btc_balance !== null && (unified.btc_balance > 0 || !local)) ? unified.btc_balance : (local?.btc_balance ?? 0);
+          const btc_balance = unified.btc_balance !== undefined ? unified.btc_balance : (local?.btc_balance ?? 0);
 
           // Requirement 4: Add a console.log for each user showing their active_plan value when loading from Supabase so we can verify in Render logs.
           console.log(`[Supabase Load Profiles] User: ${unified.email || 'unknown'} | id: ${unified.id} | active_plan: ${active_plan} | From Supabase: ${unified.active_plan} | From Local db: ${local?.active_plan}`);
@@ -453,6 +458,8 @@ class Database {
     } catch (err: any) {
       console.error('Unexpected error during Supabase boot seeding:', err.message);
     }
+    })();
+    return this.bootstrapPromise;
   }
 
   private ensureSuperAdmin() {
@@ -495,10 +502,6 @@ class Database {
         found.is_admin = true;
         modified = true;
       }
-      if (found.passwordHash !== 'Dauda@2026') {
-        found.passwordHash = 'Dauda@2026';
-        modified = true;
-      }
       if (found.is_suspended) {
         found.is_suspended = false;
         modified = true;
@@ -506,7 +509,7 @@ class Database {
       if (modified) {
         this.save();
         this.supabaseUpdate('profiles', found, found.id);
-        console.log('Super Admin profile updated with correct credentials.');
+        console.log('Super Admin profile permissions verified.');
       }
     }
   }
