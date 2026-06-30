@@ -894,7 +894,7 @@ export default function App() {
                 <div className="flex whitespace-nowrap animate-[marquee_50s_linear_infinite] gap-12 items-center">
                   {[
                     { user: 'John D.', country: '🇺🇸 USA', amount: '0.0045 BTC', time: '1 min ago' },
-                    { user: 'Aisha K.', country: '🇳🇬 Nigeria', amount: '0.0128 BTC', time: '2 mins ago' },
+                    { user: 'Charlotte W.', country: '🇬🇧 England', amount: '0.0128 BTC', time: '2 mins ago' },
                     { user: 'Hiroshi M.', country: '🇯🇵 Japan', amount: '0.0094 BTC', time: '5 mins ago' },
                     { user: 'Mateo S.', country: '🇪🇸 Spain', amount: '0.0210 BTC', time: '7 mins ago' },
                     { user: 'Elena B.', country: '🇨🇦 Canada', amount: '0.0035 BTC', time: '9 mins ago' },
@@ -903,7 +903,7 @@ export default function App() {
                     { user: 'Amara C.', country: '🇿🇦 South Africa', amount: '0.0112 BTC', time: '18 mins ago' }
                   ].concat([
                     { user: 'John D.', country: '🇺🇸 USA', amount: '0.0045 BTC', time: '1 min ago' },
-                    { user: 'Aisha K.', country: '🇳🇬 Nigeria', amount: '0.0128 BTC', time: '2 mins ago' },
+                    { user: 'Charlotte W.', country: '🇬🇧 England', amount: '0.0128 BTC', time: '2 mins ago' },
                     { user: 'Hiroshi M.', country: '🇯🇵 Japan', amount: '0.0094 BTC', time: '5 mins ago' },
                     { user: 'Mateo S.', country: '🇪🇸 Spain', amount: '0.0210 BTC', time: '7 mins ago' },
                     { user: 'Elena B.', country: '🇨🇦 Canada', amount: '0.0035 BTC', time: '9 mins ago' },
@@ -991,13 +991,13 @@ export default function App() {
                           <div className="flex items-center space-x-3">
                             <img 
                               src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80" 
-                              alt="Aisha K." 
+                              alt="Charlotte W." 
                               referrerPolicy="no-referrer"
                               className="w-11 h-11 rounded-full object-cover border border-[#252A36]" 
                             />
                             <div>
-                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Aisha K.</h4>
-                              <span className="text-[10px] text-neutral-500 block mt-0.5">Active Hashing Client · Nigeria</span>
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Charlotte W.</h4>
+                              <span className="text-[10px] text-neutral-500 block mt-0.5">Active Hashing Client · England</span>
                             </div>
                           </div>
                           <div className="flex text-amber-500">
