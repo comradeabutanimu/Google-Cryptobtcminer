@@ -3,15 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Profile, Plan, Transaction, Deposit, Withdrawal, ActivityLog, Notification, Announcement 
 } from '../src/types.js';
-
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DB_DIR, 'db.json');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -88,7 +83,7 @@ class Database {
   constructor() {
     this.data = {
       profiles: [],
-      plans: [], // Start empty, always load from Supabase
+      plans: DEFAULT_PLANS, // Seed with default plans initially so that if Supabase is slow we have them
       transactions: [],
       deposits: [],
       withdrawals: [],
@@ -136,43 +131,7 @@ class Database {
       this.tableColumns.set(table, new Set<string>(cols));
     }
 
-    this.init();
     this.bootstrapSupabase();
-  }
-
-  private init() {
-    try {
-      if (!fs.existsSync(DB_DIR)) {
-        fs.mkdirSync(DB_DIR, { recursive: true });
-      }
-
-      if (fs.existsSync(DB_FILE)) {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        const parsed = JSON.parse(raw);
-        this.data = {
-          profiles: (parsed.profiles || []).map((p: any) => {
-            if (p.active_plan === 'plan_free' || p.active_plan === 'free') {
-              p.active_plan = null;
-            }
-            if (p.email && p.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
-              p.is_suspended = false;
-            }
-            return p;
-          }),
-          plans: parsed.plans && parsed.plans.length > 0 ? parsed.plans : [],
-          transactions: parsed.transactions || [],
-          deposits: parsed.deposits || [],
-          withdrawals: parsed.withdrawals || [],
-          activity_logs: parsed.activity_logs || [],
-          notifications: parsed.notifications || [],
-          announcements: parsed.announcements || DEFAULT_ANNOUNCEMENTS
-        };
-      } else {
-        this.save();
-      }
-    } catch (err) {
-      console.error('Error initializing database file; failing back to in-memory.', err);
-    }
   }
 
   public async bootstrapSupabase() {
@@ -680,11 +639,8 @@ class Database {
   }
 
   public save() {
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Failed to persist database file:', err);
-    }
+    // No-op: Local JSON persistence removed to ensure absolute statelessness and prevent data loss.
+    // All changes are persisted directly to Supabase.
   }
 
   // Helper getters
