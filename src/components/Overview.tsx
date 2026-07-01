@@ -6,8 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Eye, EyeOff, Coins, Zap, Trophy, TrendingUp, ArrowUpRight, 
-  ChevronRight, Volume2, ShieldAlert, Cpu, ArrowRightLeft, Loader2,
-  Calculator
+  ChevronRight, Volume2, ShieldAlert, Cpu, ArrowRightLeft, Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Profile, Transaction, Announcement, CoingeckoPrice, Plan } from '../types.js';
@@ -36,10 +35,6 @@ export default function Overview({
 }: OverviewProps) {
   const [blur, setBlur] = useState(profile.settings.blurBalances);
   const [liveBtc, setLiveBtc] = useState(profile.btc_balance);
-
-  // Mining Profit Calculator state
-  const [calcHashrate, setCalcHashrate] = useState('3');
-  const [calcUnit, setCalcUnit] = useState<'GH/s' | 'TH/s' | 'PH/s'>('TH/s');
 
   // Unlocked capital swap and withdraw states
   const [openSwapModal, setOpenSwapModal] = useState(false);
@@ -326,53 +321,6 @@ export default function Overview({
     ? `${pathD} L ${points[points.length-1].x} ${padding + chartHeight} L ${points[0].x} ${padding + chartHeight} Z`
     : '';
 
-  // Mining Profit Calculator Logic
-  const parseCalcHashrate = parseFloat(calcHashrate) || 0;
-  const calcResults = (() => {
-    if (parseCalcHashrate <= 0) {
-      return { dailyBtc: 0, weeklyBtc: 0, monthlyBtc: 0, tier: 'No Active Setup', priceRange: '$0 USDT', hInTh: 0 };
-    }
-    let hInTh = parseCalcHashrate;
-    if (calcUnit === 'GH/s') hInTh = parseCalcHashrate / 1000;
-    else if (calcUnit === 'PH/s') hInTh = parseCalcHashrate * 1000;
-
-    let efficiency = 0.00048718;
-    if (hInTh <= 0.5) {
-      efficiency = 0.00048718;
-    } else if (hInTh <= 3.0) {
-      const t = (hInTh - 0.5) / (3.0 - 0.5);
-      efficiency = 0.00048718 + t * (0.00210826 - 0.00048718);
-    } else if (hInTh <= 15.0) {
-      const t = (hInTh - 3.0) / (15.0 - 3.0);
-      efficiency = 0.00210826 + t * (0.00256410 - 0.00210826);
-    } else {
-      efficiency = 0.00256410;
-    }
-
-    const dailyBtc = hInTh * efficiency;
-    const weeklyBtc = dailyBtc * 7;
-    const monthlyBtc = dailyBtc * 30;
-
-    let tier = 'Starter Tier Equivalent';
-    let priceRange = '$500 USDT';
-    if (hInTh <= 0.5) {
-      tier = 'Starter Tier Equivalent';
-      priceRange = '$500 USDT';
-    } else if (hInTh <= 3.0) {
-      tier = 'Pro Tier Equivalent';
-      priceRange = '$10,000 USDT';
-    } else if (hInTh <= 15.0) {
-      tier = 'VIP Tier Equivalent';
-      priceRange = '$50,000 USDT';
-    } else {
-      tier = 'Enterprise Custom Tier';
-      const estimatedCost = hInTh * 3333; // Pro-rated from VIP tier
-      priceRange = `$${Math.round(estimatedCost).toLocaleString()} USDT`;
-    }
-
-    return { dailyBtc, weeklyBtc, monthlyBtc, tier, priceRange, hInTh };
-  })();
-
   return (
     <div className="space-y-6">
       {/* 4 Stat Summary Cards */}
@@ -645,207 +593,6 @@ export default function Overview({
               <span className="font-extrabold text-[#F97316] font-mono mt-1 text-sm block">
                 {dailyEarningRate.toLocaleString()} BTC
               </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mining Profit Calculator Card */}
-      <div id="mining-profit-calculator" className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xs text-left animate-fade-in">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#F97316] shrink-0">
-            <Calculator className="h-5 w-5" />
-          </div>
-          <div>
-            <h4 className="text-lg font-bold text-gray-900">Mining Profit Calculator</h4>
-            <p className="text-xs text-gray-400 mt-0.5">Project potential payouts based on your customized hashrate allocation and current index prices</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-6">
-          {/* Left Inputs Column */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/60">
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Enter Desired Hashrate
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="0.01"
-                  step="any"
-                  value={calcHashrate}
-                  onChange={(e) => setCalcHashrate(e.target.value)}
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono text-sm text-gray-800 bg-white"
-                />
-                <select
-                  value={calcUnit}
-                  onChange={(e) => setCalcUnit(e.target.value as any)}
-                  className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 font-bold text-sm text-gray-700 bg-white cursor-pointer"
-                >
-                  <option value="GH/s">GH/s</option>
-                  <option value="TH/s">TH/s</option>
-                  <option value="PH/s">PH/s</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Quick Presets */}
-            <div>
-              <span className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">
-                Quick Contract Presets
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcHashrate('500');
-                    setCalcUnit('GH/s');
-                  }}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
-                    calcHashrate === '500' && calcUnit === 'GH/s'
-                      ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Starter (500 GH/s)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcHashrate('3');
-                    setCalcUnit('TH/s');
-                  }}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
-                    calcHashrate === '3' && calcUnit === 'TH/s'
-                      ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Pro (3 TH/s)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcHashrate('15');
-                    setCalcUnit('TH/s');
-                  }}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
-                    calcHashrate === '15' && calcUnit === 'TH/s'
-                      ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  VIP (15 TH/s)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcHashrate('50');
-                    setCalcUnit('TH/s');
-                  }}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
-                    calcHashrate === '50' && calcUnit === 'TH/s'
-                      ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Enterprise (50 TH/s)
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Interactive Slider (in TH/s) */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-gray-500 uppercase tracking-wider">Interactive Slider Adjustment</span>
-                <span className="font-mono text-gray-400 font-semibold">(Values calibrated in TH/s)</span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="50"
-                step="0.1"
-                value={calcUnit === 'GH/s' ? (parseCalcHashrate / 1000).toFixed(2) : calcUnit === 'PH/s' ? (parseCalcHashrate * 1000).toFixed(2) : calcHashrate}
-                onChange={(e) => {
-                  setCalcHashrate(e.target.value);
-                  setCalcUnit('TH/s');
-                }}
-                className="w-full h-1.5 bg-gray-150 rounded-lg appearance-none cursor-pointer accent-orange-500"
-              />
-              <div className="flex justify-between text-[10px] text-gray-400 font-mono">
-                <span>0.1 TH/s</span>
-                <span>25 TH/s</span>
-                <span>50 TH/s</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Outputs Column */}
-          <div className="lg:col-span-5 bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-2xl p-5 text-white shadow-sm flex flex-col justify-between h-full min-h-[300px]">
-            <div>
-              <div className="flex justify-between items-center pb-3 border-b border-neutral-700/60 mb-4">
-                <span className="text-xs font-bold tracking-wider text-orange-400 uppercase">Estimated Dividends</span>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-neutral-700 rounded-md font-mono text-gray-300">
-                  BTC Index: ${btcPriceUsd.toLocaleString()}
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {/* Daily Earning */}
-                <div>
-                  <span className="text-[10px] text-gray-400 block font-semibold uppercase tracking-wider">Estimated Daily Return</span>
-                  <span className="text-lg font-bold font-mono text-emerald-400 block">
-                    {calcResults.dailyBtc.toFixed(8)} BTC
-                  </span>
-                  <span className="text-xs text-gray-300 font-medium">
-                    ~${(calcResults.dailyBtc * btcPriceUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
-                  </span>
-                </div>
-
-                {/* Weekly Earning */}
-                <div className="pt-3 border-t border-neutral-700/40">
-                  <span className="text-[10px] text-gray-400 block font-semibold uppercase tracking-wider">Estimated Weekly Return</span>
-                  <span className="text-lg font-bold font-mono text-emerald-400 block">
-                    {calcResults.weeklyBtc.toFixed(8)} BTC
-                  </span>
-                  <span className="text-xs text-gray-300 font-medium">
-                    ~${(calcResults.weeklyBtc * btcPriceUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
-                  </span>
-                </div>
-
-                {/* Monthly Earning */}
-                <div className="pt-3 border-t border-neutral-700/40">
-                  <span className="text-[10px] text-gray-400 block font-semibold uppercase tracking-wider">Estimated Monthly Return</span>
-                  <span className="text-lg font-bold font-mono text-emerald-400 block">
-                    {calcResults.monthlyBtc.toFixed(8)} BTC
-                  </span>
-                  <span className="text-xs text-gray-300 font-medium">
-                    ~${(calcResults.monthlyBtc * btcPriceUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 pt-3 border-t border-neutral-700/60 flex flex-col gap-3">
-              <div className="flex justify-between items-center text-xs">
-                <div>
-                  <span className="text-gray-400 text-[10px] block uppercase tracking-wider">Equivalent Contract</span>
-                  <span className="font-bold text-white block">{calcResults.tier}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-gray-400 text-[10px] block uppercase tracking-wider">Typical Price</span>
-                  <span className="font-bold font-mono text-orange-400 block">{calcResults.priceRange}</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onNavigate('plans')}
-                className="w-full py-2.5 bg-[#F97316] hover:bg-orange-600 active:bg-orange-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer text-center uppercase tracking-wider shadow-xs"
-              >
-                Purchase Contract & Start Earning
-              </button>
             </div>
           </div>
         </div>
