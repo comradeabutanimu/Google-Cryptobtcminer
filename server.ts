@@ -965,7 +965,7 @@ async function startServer() {
 
     let userId = 'usr_' + Math.random().toString(36).substr(2, 9);
     
-    if (db.supabaseClient) {
+    if (db.supabaseClient && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { data: authUser, error: authError } = await db.supabaseClient.auth.admin.createUser({
         email: emailKey,
         password: password,
@@ -1400,18 +1400,23 @@ async function startServer() {
       return res.status(401).json({ error: 'Incorrect email or password' });
     }
 
-    if (db.supabaseClient) {
+    const currentDbPassword = (user as any).passwordHash || (user as any).passwordhash || (user as any).password_hash;
+    let loginSuccess = false;
+
+    if (currentDbPassword && currentDbPassword === password) {
+      loginSuccess = true;
+    } else if (db.supabaseClient) {
       const { data: authData, error: authError } = await db.supabaseClient.auth.signInWithPassword({
         email: emailKey,
         password: password
       });
-      if (authError || !authData.user) {
-        return res.status(401).json({ error: authError?.message || 'Incorrect email or password' });
+      if (!authError && authData.user) {
+        loginSuccess = true;
       }
-    } else {
-      if ((user as any).passwordHash && (user as any).passwordHash !== password) {
-        return res.status(401).json({ error: 'Incorrect email or password' });
-      }
+    }
+
+    if (!loginSuccess) {
+      return res.status(401).json({ error: 'Incorrect email or password' });
     }
 
     if (user.is_suspended) {
@@ -1451,18 +1456,23 @@ async function startServer() {
       return res.status(401).json({ error: 'Incorrect email or password credentials' });
     }
 
-    if (db.supabaseClient) {
+    const currentDbPassword = (user as any).passwordHash || (user as any).passwordhash || (user as any).password_hash;
+    let credentialsValid = false;
+
+    if (currentDbPassword && currentDbPassword === password) {
+      credentialsValid = true;
+    } else if (db.supabaseClient) {
       const { data: authData, error: authError } = await db.supabaseClient.auth.signInWithPassword({
         email: emailKey,
         password: password
       });
-      if (authError || !authData.user) {
-        return res.status(401).json({ error: authError?.message || 'Incorrect email or password credentials' });
+      if (!authError && authData.user) {
+        credentialsValid = true;
       }
-    } else {
-      if ((user as any).passwordHash && (user as any).passwordHash !== password) {
-        return res.status(401).json({ error: 'Incorrect email or password credentials' });
-      }
+    }
+
+    if (!credentialsValid) {
+      return res.status(401).json({ error: 'Incorrect email or password credentials' });
     }
 
     if (user.is_suspended) {
@@ -1647,7 +1657,7 @@ async function startServer() {
       return res.status(404).json({ error: 'Recovery validation failed: associated account is missing.' });
     }
 
-    if (db.supabaseClient) {
+    if (db.supabaseClient && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { error: authError } = await db.supabaseClient.auth.admin.updateUserById(
         user.id,
         { password: password }
@@ -1655,10 +1665,9 @@ async function startServer() {
       if (authError) {
         return res.status(400).json({ error: 'Failed to reset password: ' + authError.message });
       }
-    } else {
-      (user as any).passwordHash = password;
     }
 
+    (user as any).passwordHash = password;
     await db.updateProfile(user);
 
     await db.addActivityLog({
@@ -1889,17 +1898,26 @@ async function startServer() {
       return res.status(400).json({ error: 'Current password and new password are required' });
     }
 
-    if (db.supabaseClient) {
-      // Verify current password by attempting to sign in
+    const currentDbPassword = (user as any).passwordHash || (user as any).passwordhash || (user as any).password_hash;
+    let isCurrentPasswordCorrect = false;
+
+    if (currentDbPassword && currentDbPassword === currentPassword) {
+      isCurrentPasswordCorrect = true;
+    } else if (db.supabaseClient) {
       const { error: verifyError } = await db.supabaseClient.auth.signInWithPassword({
         email: user.email,
         password: currentPassword
       });
-      if (verifyError) {
-        return res.status(400).json({ error: 'Current password is incorrect' });
+      if (!verifyError) {
+        isCurrentPasswordCorrect = true;
       }
+    }
 
-      // Update password in Supabase Auth
+    if (!isCurrentPasswordCorrect) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    if (db.supabaseClient && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { error: authError } = await db.supabaseClient.auth.admin.updateUserById(
         user.id,
         { password: newPassword }
@@ -1907,13 +1925,10 @@ async function startServer() {
       if (authError) {
         return res.status(400).json({ error: 'Failed to update password: ' + authError.message });
       }
-    } else {
-      if ((user as any).passwordHash !== currentPassword) {
-        return res.status(400).json({ error: 'Current password is incorrect' });
-      }
-      (user as any).passwordHash = newPassword;
-      await db.updateProfile(user);
     }
+
+    (user as any).passwordHash = newPassword;
+    await db.updateProfile(user);
 
     await db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
