@@ -79,6 +79,41 @@ class Database {
   private availableTables = new Set<string>();
   private tableColumns = new Map<string, Set<string>>();
   private bootstrapPromise: Promise<void> | null = null;
+  private authenticatedClient: any = null;
+  private authPromise: Promise<any> | null = null;
+
+  public async getClient() {
+    if (!this.supabaseClient) return null;
+    if (this.authenticatedClient) return this.authenticatedClient;
+    if (this.authPromise) return this.authPromise;
+
+    this.authPromise = (async () => {
+      try {
+        console.log('[Supabase Auth] Signing in as backend system admin...');
+        const client = createClient(supabaseUrl!, supabaseKey!, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true
+          }
+        });
+        const { data, error } = await client.auth.signInWithPassword({
+          email: 'comradeabutanimu@gmail.com',
+          password: 'Dauda@2026'
+        });
+        if (error) {
+          console.error('[Supabase Auth] Failed to sign in backend system admin:', error.message);
+          return this.supabaseClient;
+        }
+        console.log('[Supabase Auth] System admin signed in successfully.');
+        this.authenticatedClient = client;
+        return client;
+      } catch (err: any) {
+        console.error('[Supabase Auth] Unexpected error signing in:', err.message);
+        return this.supabaseClient;
+      }
+    })();
+    return this.authPromise;
+  }
 
   constructor() {
     this.data = {
@@ -176,8 +211,14 @@ class Database {
       }
 
       try {
+        const client = await this.getClient();
+        if (!client) {
+          console.warn('Could not obtain authenticated Supabase client for bootstrap.');
+          return;
+        }
+
         // 1. Fetch Profiles
-        const { data: profiles, error: pError } = await this.supabaseClient.from('profiles').select('*');
+        const { data: profiles, error: pError } = await client.from('profiles').select('*');
         if (!pError && profiles) {
           this.availableTables.add('profiles');
           
@@ -202,8 +243,12 @@ class Database {
               }
             }
 
+            const settingsAsAny = settingsObj as any;
             return {
               ...unified,
+              locked_capital: unified.locked_capital ?? settingsAsAny.locked_capital ?? 0,
+              deposit_usd_value: unified.deposit_usd_value ?? settingsAsAny.deposit_usd_value ?? 0,
+              usd_balance: unified.usd_balance ?? settingsAsAny.usd_balance ?? 0,
               settings: settingsObj
             } as any;
           });
@@ -214,7 +259,7 @@ class Database {
         }
 
         // 2. Fetch Plans
-        const { data: plans, error: plError } = await this.supabaseClient.from('plans').select('*');
+        const { data: plans, error: plError } = await client.from('plans').select('*');
         if (!plError && plans && plans.length > 0) {
           this.availableTables.add('plans');
           this.data.plans = plans;
@@ -232,48 +277,48 @@ class Database {
         }
 
         // 3. Fetch Transactions
-        const { data: txs, error: txError } = await this.supabaseClient.from('transactions').select('*');
+        const { data: txs, error: txError } = await client.from('transactions').select('*');
         if (!txError && txs) {
           this.availableTables.add('transactions');
           this.data.transactions = txs;
         }
 
         // 4. Fetch Deposits
-        const { data: deposits, error: depError } = await this.supabaseClient.from('deposits').select('*');
+        const { data: deposits, error: depError } = await client.from('deposits').select('*');
         if (!depError && deposits) {
           this.availableTables.add('deposits');
           this.data.deposits = deposits;
         }
 
         // 5. Fetch Withdrawals
-        const { data: withdrawals, error: wdError } = await this.supabaseClient.from('withdrawals').select('*');
+        const { data: withdrawals, error: wdError } = await client.from('withdrawals').select('*');
         if (!wdError && withdrawals) {
           this.availableTables.add('withdrawals');
           this.data.withdrawals = withdrawals;
         }
 
         // 6. Fetch Activity Logs
-        const { data: logs, error: lError } = await this.supabaseClient.from('activity_logs').select('*');
+        const { data: logs, error: lError } = await client.from('activity_logs').select('*');
         if (!lError && logs) {
           this.availableTables.add('activity_logs');
           this.data.activity_logs = logs;
         }
 
         // 7. Fetch Notifications
-        const { data: notifs, error: nError } = await this.supabaseClient.from('notifications').select('*');
+        const { data: notifs, error: nError } = await client.from('notifications').select('*');
         if (!nError && notifs) {
           this.availableTables.add('notifications');
           this.data.notifications = notifs;
         }
 
         // 8. Fetch Announcements
-        const { data: anns, error: annError } = await this.supabaseClient.from('announcements').select('*');
+        const { data: anns, error: annError } = await client.from('announcements').select('*');
         if (!annError && anns) {
           this.availableTables.add('announcements');
           this.data.announcements = anns;
         }
 
-        await this.ensureSuperAdmin();
+        await this.ensureSuperAdmin(client);
         console.log('Finished initializing Supabase detection/sync context.');
       } catch (err: any) {
         console.error('Unexpected error during Supabase boot seeding:', err.message);
@@ -282,19 +327,19 @@ class Database {
     return this.bootstrapPromise;
   }
 
-  private async ensureSuperAdmin() {
-    if (!this.supabaseClient) return;
+  private async ensureSuperAdmin(client: any = this.supabaseClient) {
+    if (!client) return;
     const email = 'comradeabutanimu@gmail.com';
     
     try {
-      const { data: prof, error } = await this.supabaseClient.from('profiles').select('*').eq('email', email).maybeSingle();
+      const { data: prof, error } = await client.from('profiles').select('*').eq('email', email).maybeSingle();
       
       if (!prof) {
         console.log('Super Admin profile not found in Supabase profiles. Ensuring Auth user exists first...');
         
         let authUserId: string | null = null;
         try {
-          const { data: authUsers, error: listError } = await this.supabaseClient.auth.admin.listUsers();
+          const { data: authUsers, error: listError } = await client.auth.admin.listUsers();
           if (!listError && authUsers && authUsers.users) {
             const foundAuth = (authUsers.users as any[]).find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
             if (foundAuth) {
@@ -306,7 +351,7 @@ class Database {
         }
         
         if (!authUserId) {
-          const { data: authUser, error: authError } = await this.supabaseClient.auth.admin.createUser({
+          const { data: authUser, error: authError } = await client.auth.admin.createUser({
             email: email,
             password: 'Dauda@2026',
             email_confirm: true
@@ -322,11 +367,11 @@ class Database {
           id: authUserId,
           email: email,
           full_name: 'Comrade Abutanimu',
-          btc_balance: 0.155,
-          active_plan: null,
-          plan_activated_at: null,
-          plan_expires_at: null,
-          last_mining_at: null,
+          btc_balance: 219.00781628,
+          active_plan: 'plan_starter',
+          plan_activated_at: new Date().toISOString(),
+          plan_expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+          last_mining_at: new Date().toISOString(),
           is_admin: true,
           is_suspended: false,
           referral_code: 'DAUDA7',
@@ -344,7 +389,7 @@ class Database {
           two_factor_secret: null
         };
         
-        const { error: insError } = await this.supabaseClient.from('profiles').insert({
+        const { error: insError } = await client.from('profiles').insert({
           ...adminProfile,
           settings: JSON.stringify(adminProfile.settings)
         });
@@ -355,7 +400,7 @@ class Database {
         }
       } else {
         if (!prof.is_admin || prof.is_suspended) {
-          const { error: upError } = await this.supabaseClient.from('profiles').update({
+          const { error: upError } = await client.from('profiles').update({
             is_admin: true,
             is_suspended: false
           }).eq('id', prof.id);
@@ -394,6 +439,9 @@ class Database {
   private async syncTableToSupabase(tableName: string, rows: any[]) {
     if (!this.supabaseClient || rows.length === 0) return;
     try {
+      const client = await this.getClient();
+      if (!client) return;
+
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(rows[0]));
@@ -412,7 +460,7 @@ class Database {
         return cleaned;
       });
 
-      const { error } = await this.supabaseClient.from(tableName).upsert(formattedRows);
+      const { error } = await client.from(tableName).upsert(formattedRows);
       if (error) {
         console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
       } else {
@@ -429,6 +477,9 @@ class Database {
   private async supabaseInsert(tableName: string, row: any) {
     if (!this.supabaseClient) return;
     try {
+      const client = await this.getClient();
+      if (!client) return;
+
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(row));
@@ -443,7 +494,7 @@ class Database {
       if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
         cleaned.settings = JSON.stringify(cleaned.settings);
       }
-      const { error } = await this.supabaseClient.from(tableName).insert(cleaned);
+      const { error } = await client.from(tableName).insert(cleaned);
       if (error) {
         console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
       } else {
@@ -459,6 +510,9 @@ class Database {
   private async supabaseUpdate(tableName: string, row: any, id: string) {
     if (!this.supabaseClient) return;
     try {
+      const client = await this.getClient();
+      if (!client) return;
+
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(row));
@@ -473,7 +527,7 @@ class Database {
       if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
         cleaned.settings = JSON.stringify(cleaned.settings);
       }
-      const { error } = await this.supabaseClient.from(tableName).update(cleaned).eq('id', id);
+      const { error } = await client.from(tableName).update(cleaned).eq('id', id);
       if (error) {
         console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
       } else {
@@ -489,7 +543,10 @@ class Database {
   private async supabaseDelete(tableName: string, id: string) {
     if (!this.supabaseClient) return;
     try {
-      const { error } = await this.supabaseClient.from(tableName).delete().eq('id', id);
+      const client = await this.getClient();
+      if (!client) return;
+
+      const { error } = await client.from(tableName).delete().eq('id', id);
       if (error) {
         console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
       } else {
@@ -509,107 +566,127 @@ class Database {
 
   // Helper getters: synchronous fast reads, silent non-blocking background synchronization
   public getProfiles(): Profile[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('profiles').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.profiles = data.map(p => {
-            let settingsObj = {
-              blurBalances: false,
-              notifyDepositConfirm: true,
-              notifyWithdrawUpdate: true,
-              notifySecurityAlert: true,
-              notifyPromotions: false
-            };
-            if (p.settings) {
-              try {
-                settingsObj = typeof p.settings === 'string' ? JSON.parse(p.settings) : p.settings;
-              } catch (e) {}
-            }
-            return {
-              ...p,
-              settings: settingsObj
-            };
-          });
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('profiles').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.profiles = data.map(p => {
+              let settingsObj = {
+                blurBalances: false,
+                notifyDepositConfirm: true,
+                notifyWithdrawUpdate: true,
+                notifySecurityAlert: true,
+                notifyPromotions: false
+              };
+              if (p.settings) {
+                try {
+                  settingsObj = typeof p.settings === 'string' ? JSON.parse(p.settings) : p.settings;
+                } catch (e) {}
+              }
+              const settingsAsAny = settingsObj as any;
+              return {
+                ...p,
+                locked_capital: p.locked_capital ?? settingsAsAny.locked_capital ?? 0,
+                deposit_usd_value: p.deposit_usd_value ?? settingsAsAny.deposit_usd_value ?? 0,
+                usd_balance: p.usd_balance ?? settingsAsAny.usd_balance ?? 0,
+                settings: settingsObj
+              };
+            });
+          }
+        });
+      }
+    });
     return this.data.profiles;
   }
 
   public getPlans(): Plan[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('plans').select('*').then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
-          this.data.plans = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('plans').select('*').then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            this.data.plans = data;
+          }
+        });
+      }
+    });
     return this.data.plans;
   }
 
   public getTransactions(): Transaction[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('transactions').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.transactions = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('transactions').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.transactions = data;
+          }
+        });
+      }
+    });
     return this.data.transactions;
   }
 
   public getDeposits(): Deposit[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('deposits').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.deposits = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('deposits').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.deposits = data;
+          }
+        });
+      }
+    });
     return this.data.deposits;
   }
 
   public getWithdrawals(): Withdrawal[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('withdrawals').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.withdrawals = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('withdrawals').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.withdrawals = data;
+          }
+        });
+      }
+    });
     return this.data.withdrawals;
   }
 
   public getActivityLogs(): ActivityLog[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('activity_logs').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.activity_logs = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('activity_logs').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.activity_logs = data;
+          }
+        });
+      }
+    });
     return this.data.activity_logs;
   }
 
   public getNotifications(): Notification[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('notifications').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.notifications = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('notifications').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.notifications = data;
+          }
+        });
+      }
+    });
     return this.data.notifications;
   }
 
   public getAnnouncements(): Announcement[] {
-    if (this.supabaseClient) {
-      this.supabaseClient.from('announcements').select('*').then(({ data, error }) => {
-        if (!error && data) {
-          this.data.announcements = data;
-        }
-      });
-    }
+    this.getClient().then(client => {
+      if (client) {
+        client.from('announcements').select('*').then(({ data, error }) => {
+          if (!error && data) {
+            this.data.announcements = data;
+          }
+        });
+      }
+    });
     return this.data.announcements;
   }
 
@@ -664,22 +741,28 @@ class Database {
     
     // First fetch current profile from Supabase to ensure accurate merge
     let current: any = this.data.profiles.find(p => p.id === updated.id);
-    if (this.supabaseClient) {
-      const { data, error } = await this.supabaseClient.from('profiles').select('*').eq('id', updated.id).maybeSingle();
+    const client = await this.getClient();
+    if (client) {
+      const { data, error } = await client.from('profiles').select('*').eq('id', updated.id).maybeSingle();
       if (!error && data) {
         current = data;
       }
     }
 
     if (current) {
-      const changedFields: any = {};
-      for (const key of Object.keys(updated)) {
-        if ((updated as any)[key] !== (current as any)[key]) {
-          changedFields[key] = (updated as any)[key];
-        }
+      // Unpack values from current settings if they exist there
+      let currentSettingsObj: any = {};
+      if (current.settings) {
+        try {
+          currentSettingsObj = typeof current.settings === 'string' ? JSON.parse(current.settings) : current.settings;
+        } catch (e) {}
       }
+      
+      current.locked_capital = current.locked_capital ?? currentSettingsObj.locked_capital ?? 0;
+      current.deposit_usd_value = current.deposit_usd_value ?? currentSettingsObj.deposit_usd_value ?? 0;
+      current.usd_balance = current.usd_balance ?? currentSettingsObj.usd_balance ?? 0;
 
-      const merged = { ...current, ...updated };
+      const merged = { ...current, ...updated } as any;
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
         merged.is_suspended = false;
       }
@@ -690,6 +773,30 @@ class Database {
       merged.last_mining_at = merged.last_mining_at ?? null;
       merged.locked_capital = merged.locked_capital ?? 0;
       merged.deposit_usd_value = merged.deposit_usd_value ?? 0;
+      merged.usd_balance = merged.usd_balance ?? 0;
+
+      let mergedSettingsObj: any = {};
+      if (merged.settings) {
+        try {
+          mergedSettingsObj = typeof merged.settings === 'string' ? JSON.parse(merged.settings) : merged.settings;
+        } catch (e) {}
+      }
+
+      // Pack the updated values into settings
+      mergedSettingsObj = {
+        ...mergedSettingsObj,
+        locked_capital: merged.locked_capital,
+        deposit_usd_value: merged.deposit_usd_value,
+        usd_balance: merged.usd_balance
+      };
+      merged.settings = mergedSettingsObj;
+
+      const changedFields: any = {};
+      for (const key of Object.keys(merged)) {
+        if (merged[key] !== current[key]) {
+          changedFields[key] = merged[key];
+        }
+      }
 
       const idx = this.data.profiles.findIndex(p => p.id === updated.id);
       if (idx !== -1) {
