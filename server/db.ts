@@ -169,10 +169,14 @@ class Database {
     this.bootstrapSupabase();
   }
 
-  public async bootstrapSupabase() {
+  public async bootstrapSupabase(force = false) {
     if (!this.supabaseClient) {
       console.log('Supabase client is not initialized because SUPABASE_URL or SUPABASE_ANON_KEY is missing.');
       return;
+    }
+
+    if (force) {
+      this.bootstrapPromise = null;
     }
 
     if (this.bootstrapPromise) {
@@ -564,129 +568,36 @@ class Database {
     // All changes are persisted directly to Supabase.
   }
 
-  // Helper getters: synchronous fast reads, silent non-blocking background synchronization
+  // Helper getters: synchronous fast reads from local memory cache
   public getProfiles(): Profile[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('profiles').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.profiles = data.map(p => {
-              let settingsObj = {
-                blurBalances: false,
-                notifyDepositConfirm: true,
-                notifyWithdrawUpdate: true,
-                notifySecurityAlert: true,
-                notifyPromotions: false
-              };
-              if (p.settings) {
-                try {
-                  settingsObj = typeof p.settings === 'string' ? JSON.parse(p.settings) : p.settings;
-                } catch (e) {}
-              }
-              const settingsAsAny = settingsObj as any;
-              return {
-                ...p,
-                locked_capital: p.locked_capital ?? settingsAsAny.locked_capital ?? 0,
-                deposit_usd_value: p.deposit_usd_value ?? settingsAsAny.deposit_usd_value ?? 0,
-                usd_balance: p.usd_balance ?? settingsAsAny.usd_balance ?? 0,
-                settings: settingsObj
-              };
-            });
-          }
-        });
-      }
-    });
     return this.data.profiles;
   }
 
   public getPlans(): Plan[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('plans').select('*').then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            this.data.plans = data;
-          }
-        });
-      }
-    });
     return this.data.plans;
   }
 
   public getTransactions(): Transaction[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('transactions').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.transactions = data;
-          }
-        });
-      }
-    });
     return this.data.transactions;
   }
 
   public getDeposits(): Deposit[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('deposits').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.deposits = data;
-          }
-        });
-      }
-    });
     return this.data.deposits;
   }
 
   public getWithdrawals(): Withdrawal[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('withdrawals').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.withdrawals = data;
-          }
-        });
-      }
-    });
     return this.data.withdrawals;
   }
 
   public getActivityLogs(): ActivityLog[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('activity_logs').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.activity_logs = data;
-          }
-        });
-      }
-    });
     return this.data.activity_logs;
   }
 
   public getNotifications(): Notification[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('notifications').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.notifications = data;
-          }
-        });
-      }
-    });
     return this.data.notifications;
   }
 
   public getAnnouncements(): Announcement[] {
-    this.getClient().then(client => {
-      if (client) {
-        client.from('announcements').select('*').then(({ data, error }) => {
-          if (!error && data) {
-            this.data.announcements = data;
-          }
-        });
-      }
-    });
     return this.data.announcements;
   }
 
@@ -739,13 +650,16 @@ class Database {
       updated.is_suspended = false;
     }
     
-    // First fetch current profile from Supabase to ensure accurate merge
+    // First retrieve the current profile from local memory cache to avoid race conditions.
+    // Fallback to querying Supabase only if it is not in the cache yet.
     let current: any = this.data.profiles.find(p => p.id === updated.id);
-    const client = await this.getClient();
-    if (client) {
-      const { data, error } = await client.from('profiles').select('*').eq('id', updated.id).maybeSingle();
-      if (!error && data) {
-        current = data;
+    if (!current) {
+      const client = await this.getClient();
+      if (client) {
+        const { data, error } = await client.from('profiles').select('*').eq('id', updated.id).maybeSingle();
+        if (!error && data) {
+          current = data;
+        }
       }
     }
 
@@ -793,7 +707,10 @@ class Database {
 
       const changedFields: any = {};
       for (const key of Object.keys(merged)) {
-        if (merged[key] !== current[key]) {
+        if (key === 'settings') {
+          // Always update settings as we pack locked_capital, deposit_usd_value, and usd_balance there
+          changedFields[key] = merged[key];
+        } else if (merged[key] !== current[key]) {
           changedFields[key] = merged[key];
         }
       }

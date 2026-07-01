@@ -3269,7 +3269,7 @@ async function startServer() {
   // Admin: Trigger manual recheck and dynamic sync with Supabase
   app.post('/api/admin/supabase/sync', adminAuthenticate, async (req, res) => {
     try {
-      await db.bootstrapSupabase();
+      await db.bootstrapSupabase(true);
       res.json({
         success: true,
         message: 'Discovered tables successfully. Sync completed!',
