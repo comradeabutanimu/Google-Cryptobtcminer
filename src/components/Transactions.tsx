@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Download, Upload, Cpu, HeartHandshake, ChevronLeft, ChevronRight, Inbox, Calendar, Filter, RotateCcw, FileSpreadsheet } from 'lucide-react';
+import { Download, Upload, Cpu, HeartHandshake, ChevronLeft, ChevronRight, Inbox, Calendar, Filter, RotateCcw, FileSpreadsheet, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { Transaction } from '../types.js';
 
 interface TransactionsProps {
@@ -368,13 +368,24 @@ export default function Transactions({ transactions }: TransactionsProps) {
 
                     {/* Status badges */}
                     <td className="py-4 px-4 text-center whitespace-nowrap">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold leading-none capitalize ${
-                        tx.status === 'completed' ? 'bg-orange-50 text-[#F97316]' :
-                        tx.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                        'bg-rose-50 text-rose-600'
-                      }`}>
-                        {tx.status}
-                      </span>
+                      <div className="flex justify-center">
+                        {tx.status === 'completed' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 border border-emerald-100 text-emerald-700">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                            Confirmed
+                          </span>
+                        ) : tx.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 border border-amber-100 text-amber-700">
+                            <Clock className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                            Pending
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 border border-rose-100 text-rose-700">
+                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                            Failed
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                   </tr>
