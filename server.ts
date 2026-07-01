@@ -931,7 +931,7 @@ async function startServer() {
   });
 
   // Auth: Verify Signup OTP & Complete Account Creation
-  app.post('/api/auth/verify-otp', (req, res) => {
+  app.post('/api/auth/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and 6-digit OTP code are required' });
@@ -963,7 +963,20 @@ async function startServer() {
       return res.status(400).json({ error: 'An account with that email already exists' });
     }
 
-    const userId = 'usr_' + Math.random().toString(36).substr(2, 9);
+    let userId = 'usr_' + Math.random().toString(36).substr(2, 9);
+    
+    if (db.supabaseClient) {
+      const { data: authUser, error: authError } = await db.supabaseClient.auth.admin.createUser({
+        email: emailKey,
+        password: password,
+        email_confirm: true
+      });
+      if (authError) {
+        return res.status(400).json({ error: 'Failed to create auth account: ' + authError.message });
+      }
+      userId = authUser.user.id;
+    }
+
     const refCode = Math.random().toString(36).substr(2, 6).toUpperCase();
 
     // Check referring
@@ -976,7 +989,7 @@ async function startServer() {
     }
 
     // New user plan: NO default active plan assigned (set to null)
-    const newProfile: Profile & { passwordHash: string } = {
+    const newProfile: Profile = {
       id: userId,
       email: emailKey,
       full_name: name,
@@ -991,7 +1004,6 @@ async function startServer() {
       referred_by: referredBy,
       admin_note: null,
       created_at: new Date().toISOString(),
-      passwordHash: password,
       settings: {
         blurBalances: false,
         notifyDepositConfirm: true,
@@ -1005,7 +1017,7 @@ async function startServer() {
     if (referredBy) {
       const referrer = profiles.find(p => p.id === referredBy);
       if (referrer) {
-        db.addNotification({
+        await db.addNotification({
           id: 'not_' + Math.random().toString(36).substr(2, 9),
           user_id: referrer.id,
           message: `Your referral invitation was used by ${name} to sign up! You will earn a 5% commission in BTC on all of their future contract deposits/purchases.`,
@@ -1015,9 +1027,9 @@ async function startServer() {
       }
     }
 
-    db.addProfile(newProfile);
+    await db.addProfile(newProfile);
 
-    db.addActivityLog({
+    await db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: userId,
       action: 'Registration (OTP Verified)',
@@ -1380,11 +1392,26 @@ async function startServer() {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    const emailKey = email.toLowerCase().trim();
     const profiles = db.getProfiles();
-    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+    const user = profiles.find(p => p.email.toLowerCase() === emailKey);
     
-    if (!user || user.passwordHash !== password) {
+    if (!user) {
       return res.status(401).json({ error: 'Incorrect email or password' });
+    }
+
+    if (db.supabaseClient) {
+      const { data: authData, error: authError } = await db.supabaseClient.auth.signInWithPassword({
+        email: emailKey,
+        password: password
+      });
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: authError?.message || 'Incorrect email or password' });
+      }
+    } else {
+      if ((user as any).passwordHash && (user as any).passwordHash !== password) {
+        return res.status(401).json({ error: 'Incorrect email or password' });
+      }
     }
 
     if (user.is_suspended) {
@@ -1398,7 +1425,7 @@ async function startServer() {
 
     await processUserLoginSecurity(req, user);
 
-    db.addActivityLog({
+    await db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Login',
@@ -1416,11 +1443,26 @@ async function startServer() {
       return res.status(400).json({ error: 'Email, password, and 2FA verification code are required.' });
     }
 
+    const emailKey = email.toLowerCase().trim();
     const profiles = db.getProfiles();
-    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+    const user = profiles.find(p => p.email.toLowerCase() === emailKey);
 
-    if (!user || user.passwordHash !== password) {
+    if (!user) {
       return res.status(401).json({ error: 'Incorrect email or password credentials' });
+    }
+
+    if (db.supabaseClient) {
+      const { data: authData, error: authError } = await db.supabaseClient.auth.signInWithPassword({
+        email: emailKey,
+        password: password
+      });
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: authError?.message || 'Incorrect email or password credentials' });
+      }
+    } else {
+      if ((user as any).passwordHash && (user as any).passwordHash !== password) {
+        return res.status(401).json({ error: 'Incorrect email or password credentials' });
+      }
     }
 
     if (user.is_suspended) {
@@ -1577,7 +1619,7 @@ async function startServer() {
   });
 
   // Password reset execution using 6-digit OTP
-  app.post('/api/auth/reset-password', (req, res) => {
+  app.post('/api/auth/reset-password', async (req, res) => {
     const { email, otp, password } = req.body;
     if (!email || !otp || !password) {
       return res.status(400).json({ error: 'Email, verification code and new password are required.' });
@@ -1605,10 +1647,21 @@ async function startServer() {
       return res.status(404).json({ error: 'Recovery validation failed: associated account is missing.' });
     }
 
-    user.passwordHash = password;
-    db.updateProfile(user);
+    if (db.supabaseClient) {
+      const { error: authError } = await db.supabaseClient.auth.admin.updateUserById(
+        user.id,
+        { password: password }
+      );
+      if (authError) {
+        return res.status(400).json({ error: 'Failed to reset password: ' + authError.message });
+      }
+    } else {
+      (user as any).passwordHash = password;
+    }
 
-    db.addActivityLog({
+    await db.updateProfile(user);
+
+    await db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Password Reset Completed',
@@ -2627,7 +2680,7 @@ async function startServer() {
 
     // Return standard profiles without sensitive details (but password can stay hidden)
     res.json(profiles.map(p => {
-      const { passwordHash, ...rest } = p;
+      const { passwordHash, ...rest } = p as any;
       return rest;
     }));
   });

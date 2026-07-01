@@ -11,7 +11,7 @@ import {
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-const supabase = (supabaseUrl && supabaseKey)
+export const supabase = (supabaseUrl && supabaseKey)
   ? createClient(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: false,
@@ -21,7 +21,7 @@ const supabase = (supabaseUrl && supabaseKey)
   : null;
 
 interface Schema {
-  profiles: (Profile & { passwordHash: string })[];
+  profiles: Profile[];
   plans: Plan[];
   transactions: Transaction[];
   deposits: Deposit[];
@@ -37,7 +37,7 @@ const DEFAULT_PLANS: Plan[] = [
     name: 'Starter',
     price_btc: 500,
     hash_rate: '500 GH/s',
-    daily_earn_btc: 0.00024359, // equivalent to ($950 total return / 60 days) at $65,000 BTC reference price
+    daily_earn_btc: 0.00024359,
     duration_days: 60,
     is_active: true,
     created_at: new Date().toISOString()
@@ -47,7 +47,7 @@ const DEFAULT_PLANS: Plan[] = [
     name: 'Pro',
     price_btc: 10000,
     hash_rate: '3 TH/s',
-    daily_earn_btc: 0.00632479, // equivalent to ($37,000 total return / 90 days) at $65,000 BTC reference price
+    daily_earn_btc: 0.00632479,
     duration_days: 90,
     is_active: true,
     created_at: new Date().toISOString()
@@ -57,7 +57,7 @@ const DEFAULT_PLANS: Plan[] = [
     name: 'VIP',
     price_btc: 50000,
     hash_rate: '15 TH/s',
-    daily_earn_btc: 0.03846154, // equivalent to ($2,500 daily return based on 5%) at $65,000 BTC reference price
+    daily_earn_btc: 0.03846154,
     duration_days: 180,
     is_active: true,
     created_at: new Date().toISOString()
@@ -75,7 +75,7 @@ const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
 
 class Database {
   private data: Schema;
-  private supabaseClient = supabase;
+  public supabaseClient = supabase;
   private availableTables = new Set<string>();
   private tableColumns = new Map<string, Set<string>>();
   private bootstrapPromise: Promise<void> | null = null;
@@ -83,7 +83,7 @@ class Database {
   constructor() {
     this.data = {
       profiles: [],
-      plans: DEFAULT_PLANS, // Seed with default plans initially so that if Supabase is slow we have them
+      plans: DEFAULT_PLANS,
       transactions: [],
       deposits: [],
       withdrawals: [],
@@ -99,7 +99,7 @@ class Database {
         'plan_activated_at', 'plan_expires_at', 'last_mining_at', 
         'is_admin', 'is_suspended', 'referral_code', 'referred_by', 
         'admin_note', 'settings', 'two_factor_enabled', 'two_factor_secret', 
-        'known_ips', 'created_at', 'passwordhash', 'password_hash'
+        'known_ips', 'created_at'
       ],
       plans: [
         'id', 'name', 'price_btc', 'hash_rate', 'daily_earn_btc', 
@@ -148,356 +148,241 @@ class Database {
       console.log('Initiating bootstrap sync from Supabase...');
       this.availableTables.clear();
 
-    try {
-      if (supabaseUrl && supabaseKey) {
-        const restUrl = `${supabaseUrl}/rest/v1`;
-        const res = await fetch(restUrl, {
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          }
-        });
-        if (res.ok) {
-          const schema = await res.json() as any;
-          if (schema && schema.definitions) {
-            for (const tableName of Object.keys(schema.definitions)) {
-              const props = schema.definitions[tableName]?.properties;
-              if (props) {
-                const columns = new Set<string>(Object.keys(props));
-                this.tableColumns.set(tableName, columns);
-                console.log(`Discovered ${columns.size} columns for Supabase table "${tableName}".`);
+      try {
+        if (supabaseUrl && supabaseKey) {
+          const restUrl = `${supabaseUrl}/rest/v1`;
+          const res = await fetch(restUrl, {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          });
+          if (res.ok) {
+            const schema = await res.json() as any;
+            if (schema && schema.definitions) {
+              for (const tableName of Object.keys(schema.definitions)) {
+                const props = schema.definitions[tableName]?.properties;
+                if (props) {
+                  const columns = new Set<string>(Object.keys(props));
+                  this.tableColumns.set(tableName, columns);
+                  console.log(`Discovered ${columns.size} columns for Supabase table "${tableName}".`);
+                }
               }
             }
           }
         }
+      } catch (err: any) {
+        console.warn('Could not fetch dynamic OpenAPI schema from PostgREST:', err.message);
       }
-    } catch (err: any) {
-      console.warn('Could not fetch dynamic OpenAPI schema from PostgREST:', err.message);
-    }
 
-    try {
-      // 1. Fetch Profiles
-      const { data: profiles, error: pError } = await this.supabaseClient.from('profiles').select('*');
-      if (!pError && profiles) {
-        this.availableTables.add('profiles');
-        
-        const mergedProfiles = profiles.map(p => {
-          const unified = { ...p };
-          // Auto map lowercased passwordhash or password_hash back to camelCase passwordHash for authentication security checks
-          if (!unified.passwordHash && unified.passwordhash) {
-            unified.passwordHash = unified.passwordhash;
-          }
-          if (!unified.passwordHash && unified.password_hash) {
-            unified.passwordHash = unified.password_hash;
-          }
-          if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
-            unified.is_suspended = false;
-          }
-
-          const local = this.data.profiles.find(lp => lp.id === unified.id);
-
-          // Deep merge: Prioritize Supabase as the absolute single source of truth
-          const active_plan = unified.active_plan !== undefined ? unified.active_plan : (local?.active_plan ?? null);
-          const plan_activated_at = unified.plan_activated_at !== undefined ? unified.plan_activated_at : (local?.plan_activated_at ?? null);
-          const plan_expires_at = unified.plan_expires_at !== undefined ? unified.plan_expires_at : (local?.plan_expires_at ?? null);
-          const last_mining_at = unified.last_mining_at !== undefined ? unified.last_mining_at : (local?.last_mining_at ?? null);
-          const locked_capital = unified.locked_capital !== undefined ? unified.locked_capital : (local?.locked_capital ?? 0);
-          const deposit_usd_value = unified.deposit_usd_value !== undefined ? unified.deposit_usd_value : (local?.deposit_usd_value ?? 0);
+      try {
+        // 1. Fetch Profiles
+        const { data: profiles, error: pError } = await this.supabaseClient.from('profiles').select('*');
+        if (!pError && profiles) {
+          this.availableTables.add('profiles');
           
-          const active_plan_investment = unified.active_plan_investment !== undefined ? unified.active_plan_investment : (local?.active_plan_investment ?? 0);
-          const active_plan_hash_rate = unified.active_plan_hash_rate !== undefined ? unified.active_plan_hash_rate : (local?.active_plan_hash_rate ?? 0);
-          const active_plan_rate = unified.active_plan_rate !== undefined ? unified.active_plan_rate : (local?.active_plan_rate ?? 0);
+          this.data.profiles = profiles.map(p => {
+            const unified = { ...p };
+            if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
+              unified.is_suspended = false;
+            }
 
-          let settingsObj = local?.settings || {
+            let settingsObj = {
+              blurBalances: false,
+              notifyDepositConfirm: true,
+              notifyWithdrawUpdate: true,
+              notifySecurityAlert: true,
+              notifyPromotions: false
+            };
+            if (unified.settings) {
+              try {
+                settingsObj = typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings;
+              } catch (e) {
+                console.warn('Failed parsing settings for ' + unified.email);
+              }
+            }
+
+            return {
+              ...unified,
+              settings: settingsObj
+            } as any;
+          });
+
+          console.log(`Loaded ${profiles.length} profiles from Supabase.`);
+        } else if (pError) {
+          console.error('Error loading profiles from Supabase:', pError.message);
+        }
+
+        // 2. Fetch Plans
+        const { data: plans, error: plError } = await this.supabaseClient.from('plans').select('*');
+        if (!plError && plans && plans.length > 0) {
+          this.availableTables.add('plans');
+          this.data.plans = plans;
+          console.log('Plans loaded from Supabase: ' + plans.length + ' plans');
+        } else if (!plError && plans && plans.length === 0) {
+          this.availableTables.add('plans');
+          await this.syncTableToSupabase('plans', DEFAULT_PLANS);
+          this.data.plans = DEFAULT_PLANS;
+          console.log('Seeded default plans to Supabase');
+        } else {
+          if (this.data.plans.length === 0) {
+            this.data.plans = DEFAULT_PLANS;
+          }
+          console.log('Plans loaded from local storage fallback: ' + this.data.plans.length + ' plans');
+        }
+
+        // 3. Fetch Transactions
+        const { data: txs, error: txError } = await this.supabaseClient.from('transactions').select('*');
+        if (!txError && txs) {
+          this.availableTables.add('transactions');
+          this.data.transactions = txs;
+        }
+
+        // 4. Fetch Deposits
+        const { data: deposits, error: depError } = await this.supabaseClient.from('deposits').select('*');
+        if (!depError && deposits) {
+          this.availableTables.add('deposits');
+          this.data.deposits = deposits;
+        }
+
+        // 5. Fetch Withdrawals
+        const { data: withdrawals, error: wdError } = await this.supabaseClient.from('withdrawals').select('*');
+        if (!wdError && withdrawals) {
+          this.availableTables.add('withdrawals');
+          this.data.withdrawals = withdrawals;
+        }
+
+        // 6. Fetch Activity Logs
+        const { data: logs, error: lError } = await this.supabaseClient.from('activity_logs').select('*');
+        if (!lError && logs) {
+          this.availableTables.add('activity_logs');
+          this.data.activity_logs = logs;
+        }
+
+        // 7. Fetch Notifications
+        const { data: notifs, error: nError } = await this.supabaseClient.from('notifications').select('*');
+        if (!nError && notifs) {
+          this.availableTables.add('notifications');
+          this.data.notifications = notifs;
+        }
+
+        // 8. Fetch Announcements
+        const { data: anns, error: annError } = await this.supabaseClient.from('announcements').select('*');
+        if (!annError && anns) {
+          this.availableTables.add('announcements');
+          this.data.announcements = anns;
+        }
+
+        await this.ensureSuperAdmin();
+        console.log('Finished initializing Supabase detection/sync context.');
+      } catch (err: any) {
+        console.error('Unexpected error during Supabase boot seeding:', err.message);
+      }
+    })();
+    return this.bootstrapPromise;
+  }
+
+  private async ensureSuperAdmin() {
+    if (!this.supabaseClient) return;
+    const email = 'comradeabutanimu@gmail.com';
+    
+    try {
+      const { data: prof, error } = await this.supabaseClient.from('profiles').select('*').eq('email', email).maybeSingle();
+      
+      if (!prof) {
+        console.log('Super Admin profile not found in Supabase profiles. Ensuring Auth user exists first...');
+        
+        let authUserId: string | null = null;
+        try {
+          const { data: authUsers, error: listError } = await this.supabaseClient.auth.admin.listUsers();
+          if (!listError && authUsers && authUsers.users) {
+            const foundAuth = (authUsers.users as any[]).find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+            if (foundAuth) {
+              authUserId = foundAuth.id;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not list auth users:', e);
+        }
+        
+        if (!authUserId) {
+          const { data: authUser, error: authError } = await this.supabaseClient.auth.admin.createUser({
+            email: email,
+            password: 'Dauda@2026',
+            email_confirm: true
+          });
+          if (authError) {
+            console.error('Failed to create Super Admin auth account:', authError.message);
+            return;
+          }
+          authUserId = authUser.user.id;
+        }
+        
+        const adminProfile: any = {
+          id: authUserId,
+          email: email,
+          full_name: 'Comrade Abutanimu',
+          btc_balance: 0.155,
+          active_plan: null,
+          plan_activated_at: null,
+          plan_expires_at: null,
+          last_mining_at: null,
+          is_admin: true,
+          is_suspended: false,
+          referral_code: 'DAUDA7',
+          referred_by: null,
+          admin_note: 'Master System Administrator Profile (Protected from delete and lock)',
+          created_at: new Date().toISOString(),
+          settings: {
             blurBalances: false,
             notifyDepositConfirm: true,
             notifyWithdrawUpdate: true,
             notifySecurityAlert: true,
             notifyPromotions: false
-          };
-          if (unified.settings) {
-            try {
-              settingsObj = typeof unified.settings === 'string' ? JSON.parse(unified.settings) : unified.settings;
-            } catch (e) {
-              console.warn('Failed parsing settings for ' + unified.email);
-            }
-          }
-
-          const btc_balance = unified.btc_balance !== undefined ? unified.btc_balance : (local?.btc_balance ?? 0);
-
-          // Requirement 4: Add a console.log for each user showing their active_plan value when loading from Supabase so we can verify in Render logs.
-          console.log(`[Supabase Load Profiles] User: ${unified.email || 'unknown'} | id: ${unified.id} | active_plan: ${active_plan} | From Supabase: ${unified.active_plan} | From Local db: ${local?.active_plan}`);
-
-          return {
-            ...local,
-            ...unified,
-            active_plan,
-            active_plan_investment,
-            active_plan_hash_rate,
-            active_plan_rate,
-            plan_activated_at,
-            plan_expires_at,
-            last_mining_at,
-            locked_capital,
-            deposit_usd_value,
-            btc_balance,
-            settings: settingsObj
-          } as any;
+          },
+          two_factor_enabled: false,
+          two_factor_secret: null
+        };
+        
+        const { error: insError } = await this.supabaseClient.from('profiles').insert({
+          ...adminProfile,
+          settings: JSON.stringify(adminProfile.settings)
         });
-
-        // Combine any local-only profiles that are not registered in Supabase yet
-        const localProfilesNotInSupabase = this.data.profiles.filter(lp => !profiles.some(sp => sp.id === lp.id));
-        this.data.profiles = [
-          ...mergedProfiles,
-          ...localProfilesNotInSupabase
-        ];
-
-        console.log(`Loaded ${profiles.length} profiles from Supabase. Total combined local: ${this.data.profiles.length}`);
-        if (localProfilesNotInSupabase.length > 0) {
-          console.log(`Discovered ${localProfilesNotInSupabase.length} local-only profiles. Sycing to Supabase...`);
-          await this.syncTableToSupabase('profiles', localProfilesNotInSupabase);
-        }
-      } else if (pError) {
-        if (pError.message.includes('Could not find the table') || pError.message.includes('relation "')) {
-          console.warn('⚠️  Table "profiles" was not found in your Supabase schema cache. Follow the instructions to run the SQL migration script to create it.');
+        if (insError) {
+          console.error('Failed to insert Super Admin profile:', insError.message);
         } else {
-          console.error('Error loading profiles from Supabase:', pError.message);
+          console.log('Super Admin user and profile created successfully.');
         }
-      }
-
-      // 2. Fetch Plans
-      const { data: plans, error: plError } = await this.supabaseClient.from('plans').select('*');
-      if (!plError && plans && plans.length > 0) {
-        this.availableTables.add('plans');
-        this.data.plans = plans;
-        console.log('Plans loaded from Supabase: ' + plans.length + ' plans');
-      } else if (!plError && plans && plans.length === 0) {
-        this.availableTables.add('plans');
-        // Only seed DEFAULT_PLANS if Supabase is completely empty
-        await this.syncTableToSupabase('plans', DEFAULT_PLANS);
-        this.data.plans = DEFAULT_PLANS;
-        console.log('Seeded default plans to Supabase');
       } else {
-        // Supabase error - keep existing plans if any, otherwise use defaults
-        if (this.data.plans.length === 0) {
-          this.data.plans = DEFAULT_PLANS;
-        }
-        console.log('Plans loaded from local storage: ' + this.data.plans.length + ' plans');
-      }
-
-      // 3. Fetch Transactions
-      const { data: txs, error: txError } = await this.supabaseClient.from('transactions').select('*');
-      if (!txError && txs) {
-        this.availableTables.add('transactions');
-        const localTxsNotInSupabase = this.data.transactions.filter(ltx => !txs.some(stx => stx.id === ltx.id));
-        this.data.transactions = [
-          ...txs,
-          ...localTxsNotInSupabase
-        ];
-        console.log(`Loaded ${txs.length} transactions from Supabase. Total combined local: ${this.data.transactions.length}`);
-        if (localTxsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('transactions', localTxsNotInSupabase);
-        }
-      } else if (txError) {
-        if (txError.message.includes('Could not find the table') || txError.message.includes('relation "')) {
-          console.warn('⚠️  Table "transactions" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading transactions from Supabase:', txError.message);
+        if (!prof.is_admin || prof.is_suspended) {
+          const { error: upError } = await this.supabaseClient.from('profiles').update({
+            is_admin: true,
+            is_suspended: false
+          }).eq('id', prof.id);
+          if (upError) {
+            console.error('Failed to update Super Admin permissions:', upError.message);
+          } else {
+            console.log('Super Admin profile permissions verified.');
+          }
         }
       }
-
-      // 4. Fetch Deposits
-      const { data: deposits, error: depError } = await this.supabaseClient.from('deposits').select('*');
-      if (!depError && deposits) {
-        this.availableTables.add('deposits');
-        const localDepositsNotInSupabase = this.data.deposits.filter(ldep => !deposits.some(sdep => sdep.id === ldep.id));
-        this.data.deposits = [
-          ...deposits,
-          ...localDepositsNotInSupabase
-        ];
-        console.log(`Loaded ${deposits.length} deposits from Supabase. Total combined local: ${this.data.deposits.length}`);
-        if (localDepositsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('deposits', localDepositsNotInSupabase);
-        }
-      } else if (depError) {
-        if (depError.message.includes('Could not find the table') || depError.message.includes('relation "')) {
-          console.warn('⚠️  Table "deposits" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading deposits from Supabase:', depError.message);
-        }
-      }
-
-      // 5. Fetch Withdrawals
-      const { data: withdrawals, error: wdError } = await this.supabaseClient.from('withdrawals').select('*');
-      if (!wdError && withdrawals) {
-        this.availableTables.add('withdrawals');
-        const localWdsNotInSupabase = this.data.withdrawals.filter(lwd => !withdrawals.some(swd => swd.id === lwd.id));
-        this.data.withdrawals = [
-          ...withdrawals,
-          ...localWdsNotInSupabase
-        ];
-        console.log(`Loaded ${withdrawals.length} withdrawals from Supabase. Total combined local: ${this.data.withdrawals.length}`);
-        if (localWdsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('withdrawals', localWdsNotInSupabase);
-        }
-      } else if (wdError) {
-        if (wdError.message.includes('Could not find the table') || wdError.message.includes('relation "')) {
-          console.warn('⚠️  Table "withdrawals" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading withdrawals from Supabase:', wdError.message);
-        }
-      }
-
-      // 6. Fetch Activity Logs
-      const { data: logs, error: lError } = await this.supabaseClient.from('activity_logs').select('*');
-      if (!lError && logs) {
-        this.availableTables.add('activity_logs');
-        const localLogsNotInSupabase = this.data.activity_logs.filter(llog => !logs.some(slog => slog.id === llog.id));
-        this.data.activity_logs = [
-          ...logs,
-          ...localLogsNotInSupabase
-        ];
-        console.log(`Loaded ${logs.length} activity_logs from Supabase. Total combined local: ${this.data.activity_logs.length}`);
-        if (localLogsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('activity_logs', localLogsNotInSupabase);
-        }
-      } else if (lError) {
-        if (lError.message.includes('Could not find the table') || lError.message.includes('relation "')) {
-          console.warn('⚠️  Table "activity_logs" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading activity_logs from Supabase:', lError.message);
-        }
-      }
-
-      // 7. Fetch Notifications
-      const { data: notifs, error: nError } = await this.supabaseClient.from('notifications').select('*');
-      if (!nError && notifs) {
-        this.availableTables.add('notifications');
-        const localNotifsNotInSupabase = this.data.notifications.filter(lnotif => !notifs.some(snotif => snotif.id === lnotif.id));
-        this.data.notifications = [
-          ...notifs,
-          ...localNotifsNotInSupabase
-        ];
-        console.log(`Loaded ${notifs.length} notifications from Supabase. Total combined local: ${this.data.notifications.length}`);
-        if (localNotifsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('notifications', localNotifsNotInSupabase);
-        }
-      } else if (nError) {
-        if (nError.message.includes('Could not find the table') || nError.message.includes('relation "')) {
-          console.warn('⚠️  Table "notifications" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading notifications from Supabase:', nError.message);
-        }
-      }
-
-      // 8. Fetch Announcements
-      const { data: anns, error: annError } = await this.supabaseClient.from('announcements').select('*');
-      if (!annError && anns) {
-        this.availableTables.add('announcements');
-        const localAnnsNotInSupabase = this.data.announcements.filter(lann => !anns.some(sann => sann.id === lann.id));
-        this.data.announcements = [
-          ...anns,
-          ...localAnnsNotInSupabase
-        ];
-        console.log(`Loaded ${anns.length} announcements from Supabase. Total combined local: ${this.data.announcements.length}`);
-        if (localAnnsNotInSupabase.length > 0) {
-          await this.syncTableToSupabase('announcements', localAnnsNotInSupabase);
-        }
-      } else if (annError) {
-        if (annError.message.includes('Could not find the table') || annError.message.includes('relation "')) {
-          console.warn('⚠️  Table "announcements" was not found in your Supabase schema cache.');
-        } else {
-          console.error('Error loading announcements from Supabase:', annError.message);
-        }
-      }
-
-      this.save();
-      this.ensureSuperAdmin();
-      console.log('Finished initializing Supabase detection/sync context.');
     } catch (err: any) {
-      console.error('Unexpected error during Supabase boot seeding:', err.message);
-    }
-    })();
-    return this.bootstrapPromise;
-  }
-
-  private ensureSuperAdmin() {
-    const email = 'comradeabutanimu@gmail.com';
-    const found = this.data.profiles.find(p => p.email && p.email.toLowerCase() === email);
-    if (!found) {
-      const adminProfile: any = {
-        id: 'usr_comrade_super_admin',
-        email: email,
-        full_name: 'Comrade Abutanimu',
-        btc_balance: 0.155,
-        active_plan: null,
-        plan_activated_at: null,
-        plan_expires_at: null,
-        last_mining_at: null,
-        is_admin: true,
-        is_suspended: false,
-        referral_code: 'DAUDA7',
-        referred_by: null,
-        admin_note: 'Master System Administrator Profile (Protected from delete and lock)',
-        created_at: new Date().toISOString(),
-        settings: {
-          blurBalances: false,
-          notifyDepositConfirm: true,
-          notifyWithdrawUpdate: true,
-          notifySecurityAlert: true,
-          notifyPromotions: false
-        },
-        passwordHash: 'Dauda@2026',
-        two_factor_enabled: false,
-        two_factor_secret: null
-      };
-      this.data.profiles.push(adminProfile);
-      this.save();
-      this.supabaseInsert('profiles', adminProfile);
-      console.log('Super Admin user created successfully.');
-    } else {
-      let modified = false;
-      if (!found.is_admin) {
-        found.is_admin = true;
-        modified = true;
-      }
-      if (found.is_suspended) {
-        found.is_suspended = false;
-        modified = true;
-      }
-      if (modified) {
-        this.save();
-        this.supabaseUpdate('profiles', found, found.id);
-        console.log('Super Admin profile permissions verified.');
-      }
+      console.error('Error during super admin check:', err.message);
     }
   }
 
   private filterRowColumns(tableName: string, row: any): any {
     const cleaned = { ...row };
-    // Always strip known non-column helper keys
     delete cleaned.detected_language;
 
     const columns = this.tableColumns.get(tableName);
     if (!columns || columns.size === 0) {
-      // Preserve passwordHash safely if columns have not been fetched yet
       return cleaned;
     }
 
     const filtered: any = {};
     for (const key of Object.keys(cleaned)) {
       const keyLower = key.toLowerCase();
-      // Keep passwordHash key mapped correctly to whichever casing columns exist (e.g., password_hash or passwordhash)
-      if (key === 'passwordHash') {
-        const foundColumn = Array.from(columns).find(
-          c => c.toLowerCase() === 'passwordhash' || c.toLowerCase() === 'password_hash'
-        );
-        if (foundColumn) {
-          filtered[foundColumn] = cleaned[key];
-          continue;
-        }
-      }
-
       const exactColumnName = Array.from(columns).find(c => c.toLowerCase() === keyLower);
       if (exactColumnName) {
         filtered[exactColumnName] = cleaned[key];
@@ -509,7 +394,6 @@ class Database {
   private async syncTableToSupabase(tableName: string, rows: any[]) {
     if (!this.supabaseClient || rows.length === 0) return;
     try {
-      // Auto register columns to avoid empty filtering
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(rows[0]));
@@ -530,11 +414,7 @@ class Database {
 
       const { error } = await this.supabaseClient.from(tableName).upsert(formattedRows);
       if (error) {
-        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
-          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase yet. Run the scheme setup script.`);
-        } else {
-          console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
-        }
+        console.warn(`Supabase dynamic sync status for upsert in "${tableName}": info - ${error.message}`);
       } else {
         if (!this.availableTables.has(tableName)) {
           this.availableTables.add(tableName);
@@ -549,7 +429,6 @@ class Database {
   private async supabaseInsert(tableName: string, row: any) {
     if (!this.supabaseClient) return;
     try {
-      // Auto register columns to avoid empty filtering
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(row));
@@ -566,14 +445,9 @@ class Database {
       }
       const { error } = await this.supabaseClient.from(tableName).insert(cleaned);
       if (error) {
-        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
-          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase. Signups won't save permanently until Supabase script is executed.`);
-        } else {
-          console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
-        }
+        console.warn(`Supabase dynamic sync status for INSERT in "${tableName}": info - ${error.message}`);
       } else {
         if (!this.availableTables.has(tableName)) {
-          console.log(`Supabase dynamic sync: Table "${tableName}" successfully verified & synced dynamically!`);
           this.availableTables.add(tableName);
         }
       }
@@ -585,7 +459,6 @@ class Database {
   private async supabaseUpdate(tableName: string, row: any, id: string) {
     if (!this.supabaseClient) return;
     try {
-      // Auto register columns to avoid empty filtering
       let cols = this.tableColumns.get(tableName);
       if (!cols) {
         cols = new Set<string>(Object.keys(row));
@@ -602,14 +475,9 @@ class Database {
       }
       const { error } = await this.supabaseClient.from(tableName).update(cleaned).eq('id', id);
       if (error) {
-        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
-          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase. Changes won't save permanently until Supabase script is executed.`);
-        } else {
-          console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
-        }
+        console.warn(`Supabase dynamic sync status for UPDATE in "${tableName}": info - ${error.message}`);
       } else {
         if (!this.availableTables.has(tableName)) {
-          console.log(`Supabase dynamic sync: Table "${tableName}" successfully verified & synced dynamically!`);
           this.availableTables.add(tableName);
         }
       }
@@ -623,11 +491,7 @@ class Database {
     try {
       const { error } = await this.supabaseClient.from(tableName).delete().eq('id', id);
       if (error) {
-        if (error.message.includes('relation "') || error.message.includes('Could not find')) {
-          console.warn(`Supabase dynamic sync: Table "${tableName}" does not exist in Supabase.`);
-        } else {
-          console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
-        }
+        console.warn(`Supabase dynamic sync status for DELETE in "${tableName}": info - ${error.message}`);
       } else {
         if (!this.availableTables.has(tableName)) {
           this.availableTables.add(tableName);
@@ -643,105 +507,183 @@ class Database {
     // All changes are persisted directly to Supabase.
   }
 
-  // Helper getters
-  public getProfiles() {
+  // Helper getters: synchronous fast reads, silent non-blocking background synchronization
+  public getProfiles(): Profile[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('profiles').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.profiles = data.map(p => {
+            let settingsObj = {
+              blurBalances: false,
+              notifyDepositConfirm: true,
+              notifyWithdrawUpdate: true,
+              notifySecurityAlert: true,
+              notifyPromotions: false
+            };
+            if (p.settings) {
+              try {
+                settingsObj = typeof p.settings === 'string' ? JSON.parse(p.settings) : p.settings;
+              } catch (e) {}
+            }
+            return {
+              ...p,
+              settings: settingsObj
+            };
+          });
+        }
+      });
+    }
     return this.data.profiles;
   }
 
-  public getPlans() {
+  public getPlans(): Plan[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('plans').select('*').then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          this.data.plans = data;
+        }
+      });
+    }
     return this.data.plans;
   }
 
-  public getTransactions() {
+  public getTransactions(): Transaction[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('transactions').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.transactions = data;
+        }
+      });
+    }
     return this.data.transactions;
   }
 
-  public getDeposits() {
+  public getDeposits(): Deposit[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('deposits').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.deposits = data;
+        }
+      });
+    }
     return this.data.deposits;
   }
 
-  public getWithdrawals() {
+  public getWithdrawals(): Withdrawal[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('withdrawals').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.withdrawals = data;
+        }
+      });
+    }
     return this.data.withdrawals;
   }
 
-  public getActivityLogs() {
+  public getActivityLogs(): ActivityLog[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('activity_logs').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.activity_logs = data;
+        }
+      });
+    }
     return this.data.activity_logs;
   }
 
-  public getNotifications() {
+  public getNotifications(): Notification[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('notifications').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.notifications = data;
+        }
+      });
+    }
     return this.data.notifications;
   }
 
-  public getAnnouncements() {
+  public getAnnouncements(): Announcement[] {
+    if (this.supabaseClient) {
+      this.supabaseClient.from('announcements').select('*').then(({ data, error }) => {
+        if (!error && data) {
+          this.data.announcements = data;
+        }
+      });
+    }
     return this.data.announcements;
   }
 
-  // Helpers to add data
-  public addProfile(profile: Profile & { passwordHash: string }) {
+  // Helpers to add data - awaiting Supabase operations for strict transactional consistency
+  public async addProfile(profile: Profile) {
     if (profile.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
       profile.is_admin = true;
     }
-    this.data.profiles.push(profile);
-    this.save();
-    this.supabaseInsert('profiles', profile);
+    const idx = this.data.profiles.findIndex(p => p.id === profile.id);
+    if (idx === -1) {
+      this.data.profiles.push(profile);
+    } else {
+      this.data.profiles[idx] = profile;
+    }
+    await this.supabaseInsert('profiles', profile);
   }
 
-  public addTransaction(tx: Transaction) {
+  public async addTransaction(tx: Transaction) {
     this.data.transactions.push(tx);
-    this.save();
-    this.supabaseInsert('transactions', tx);
+    await this.supabaseInsert('transactions', tx);
   }
 
-  public addDeposit(dep: Deposit) {
+  public async addDeposit(dep: Deposit) {
     this.data.deposits.push(dep);
-    this.save();
-    this.supabaseInsert('deposits', dep);
+    await this.supabaseInsert('deposits', dep);
   }
 
-  public addWithdrawal(wd: Withdrawal) {
+  public async addWithdrawal(wd: Withdrawal) {
     this.data.withdrawals.push(wd);
-    this.save();
-    this.supabaseInsert('withdrawals', wd);
+    await this.supabaseInsert('withdrawals', wd);
   }
 
-  public addActivityLog(log: ActivityLog) {
+  public async addActivityLog(log: ActivityLog) {
     this.data.activity_logs.push(log);
-    this.save();
-    this.supabaseInsert('activity_logs', log);
+    await this.supabaseInsert('activity_logs', log);
   }
 
-  public addNotification(notif: Notification) {
+  public async addNotification(notif: Notification) {
     this.data.notifications.push(notif);
-    this.save();
-    this.supabaseInsert('notifications', notif);
+    await this.supabaseInsert('notifications', notif);
   }
 
-  public addAnnouncement(ann: Announcement) {
+  public async addAnnouncement(ann: Announcement) {
     this.data.announcements.push(ann);
-    this.save();
-    this.supabaseInsert('announcements', ann);
+    await this.supabaseInsert('announcements', ann);
   }
 
-  public updateProfile(updated: Partial<Profile> & { id: string }) {
+  public async updateProfile(updated: Partial<Profile> & { id: string }) {
     if (updated.email && updated.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
       updated.is_suspended = false;
     }
-    const idx = this.data.profiles.findIndex(p => p.id === updated.id);
-    if (idx !== -1) {
-      const original = this.data.profiles[idx];
+    
+    // First fetch current profile from Supabase to ensure accurate merge
+    let current: any = this.data.profiles.find(p => p.id === updated.id);
+    if (this.supabaseClient) {
+      const { data, error } = await this.supabaseClient.from('profiles').select('*').eq('id', updated.id).maybeSingle();
+      if (!error && data) {
+        current = data;
+      }
+    }
+
+    if (current) {
       const changedFields: any = {};
       for (const key of Object.keys(updated)) {
-        if ((updated as any)[key] !== (original as any)[key]) {
+        if ((updated as any)[key] !== (current as any)[key]) {
           changedFields[key] = (updated as any)[key];
         }
       }
 
-      const merged = { ...original, ...updated };
+      const merged = { ...current, ...updated };
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
         merged.is_suspended = false;
       }
       
-      // Ensure these fields are explicitly defined/included
       merged.active_plan = merged.active_plan ?? null;
       merged.plan_activated_at = merged.plan_activated_at ?? null;
       merged.plan_expires_at = merged.plan_expires_at ?? null;
@@ -749,16 +691,20 @@ class Database {
       merged.locked_capital = merged.locked_capital ?? 0;
       merged.deposit_usd_value = merged.deposit_usd_value ?? 0;
 
-      this.data.profiles[idx] = merged;
-      this.save();
+      const idx = this.data.profiles.findIndex(p => p.id === updated.id);
+      if (idx !== -1) {
+        this.data.profiles[idx] = merged;
+      } else {
+        this.data.profiles.push(merged);
+      }
 
       if (Object.keys(changedFields).length > 0) {
-        this.supabaseUpdate('profiles', { id: updated.id, ...changedFields }, updated.id);
+        await this.supabaseUpdate('profiles', { id: updated.id, ...changedFields }, updated.id);
       }
     }
   }
 
-  public updatePlan(updated: Partial<Plan> & { id: string }) {
+  public async updatePlan(updated: Partial<Plan> & { id: string }) {
     const idx = this.data.plans.findIndex(p => p.id === updated.id);
     if (idx !== -1) {
       const original = this.data.plans[idx];
@@ -771,21 +717,19 @@ class Database {
 
       const merged = { ...original, ...updated };
       this.data.plans[idx] = merged;
-      this.save();
 
       if (Object.keys(changedFields).length > 0) {
-        this.supabaseUpdate('plans', { id: updated.id, ...changedFields }, updated.id);
+        await this.supabaseUpdate('plans', { id: updated.id, ...changedFields }, updated.id);
       }
     }
   }
 
-  public addPlan(plan: Plan) {
+  public async addPlan(plan: Plan) {
     this.data.plans.push(plan);
-    this.save();
-    this.supabaseInsert('plans', plan);
+    await this.supabaseInsert('plans', plan);
   }
 
-  public updateWithdrawal(updated: Partial<Withdrawal> & { id: string }) {
+  public async updateWithdrawal(updated: Partial<Withdrawal> & { id: string }) {
     const idx = this.data.withdrawals.findIndex(w => w.id === updated.id);
     if (idx !== -1) {
       const original = this.data.withdrawals[idx];
@@ -798,15 +742,14 @@ class Database {
 
       const merged = { ...original, ...updated };
       this.data.withdrawals[idx] = merged;
-      this.save();
 
       if (Object.keys(changedFields).length > 0) {
-        this.supabaseUpdate('withdrawals', { id: updated.id, ...changedFields }, updated.id);
+        await this.supabaseUpdate('withdrawals', { id: updated.id, ...changedFields }, updated.id);
       }
     }
   }
 
-  public updateDeposit(updated: Partial<Deposit> & { id: string }) {
+  public async updateDeposit(updated: Partial<Deposit> & { id: string }) {
     const idx = this.data.deposits.findIndex(d => d.id === updated.id);
     if (idx !== -1) {
       const original = this.data.deposits[idx];
@@ -819,15 +762,14 @@ class Database {
 
       const merged = { ...original, ...updated };
       this.data.deposits[idx] = merged;
-      this.save();
 
       if (Object.keys(changedFields).length > 0) {
-        this.supabaseUpdate('deposits', { id: updated.id, ...changedFields }, updated.id);
+        await this.supabaseUpdate('deposits', { id: updated.id, ...changedFields }, updated.id);
       }
     }
   }
 
-  public updateAnnouncement(updated: Partial<Announcement> & { id: string }) {
+  public async updateAnnouncement(updated: Partial<Announcement> & { id: string }) {
     const idx = this.data.announcements.findIndex(a => a.id === updated.id);
     if (idx !== -1) {
       const original = this.data.announcements[idx];
@@ -840,33 +782,39 @@ class Database {
 
       const merged = { ...original, ...updated };
       this.data.announcements[idx] = merged;
-      this.save();
 
       if (Object.keys(changedFields).length > 0) {
-        this.supabaseUpdate('announcements', { id: updated.id, ...changedFields }, updated.id);
+        await this.supabaseUpdate('announcements', { id: updated.id, ...changedFields }, updated.id);
       }
     }
   }
 
-  public deleteAnnouncement(id: string) {
+  public async deleteAnnouncement(id: string) {
     this.data.announcements = this.data.announcements.filter(a => a.id !== id);
-    this.save();
-    this.supabaseDelete('announcements', id);
+    await this.supabaseDelete('announcements', id);
   }
 
-  public deleteProfile(id: string) {
+  public async deleteProfile(id: string) {
     this.data.profiles = this.data.profiles.filter(p => p.id !== id);
     this.data.transactions = this.data.transactions.filter(t => t.user_id !== id);
     this.data.deposits = this.data.deposits.filter(d => d.user_id !== id);
     this.data.withdrawals = this.data.withdrawals.filter(w => w.user_id !== id);
     this.data.notifications = this.data.notifications.filter(n => n.user_id !== id);
     this.data.activity_logs = this.data.activity_logs.filter(a => a.user_id !== id);
-    this.save();
-    this.supabaseDelete('profiles', id);
+    await this.supabaseDelete('profiles', id);
   }
 
-  public exportDatabase() {
-    return this.data;
+  public async exportDatabase() {
+    return {
+      profiles: this.getProfiles(),
+      plans: this.getPlans(),
+      transactions: this.getTransactions(),
+      deposits: this.getDeposits(),
+      withdrawals: this.getWithdrawals(),
+      activity_logs: this.getActivityLogs(),
+      notifications: this.getNotifications(),
+      announcements: this.getAnnouncements()
+    };
   }
 
   public async importDatabase(newData: any) {
@@ -885,17 +833,13 @@ class Database {
       announcements: Array.isArray(newData.announcements) ? newData.announcements : this.data.announcements
     };
 
-    this.save();
-
     if (this.supabaseClient) {
       console.log('Initiating bulk restore/upsert to Supabase after manual database backup import...');
       const tables = ['profiles', 'plans', 'transactions', 'deposits', 'withdrawals', 'activity_logs', 'notifications', 'announcements'];
       for (const t of tables) {
-        if (this.availableTables.has(t)) {
-          const rowsToSync = (this.data as any)[t === 'activity_logs' ? 'activity_logs' : t];
-          if (rowsToSync && rowsToSync.length > 0) {
-            await this.syncTableToSupabase(t, rowsToSync);
-          }
+        const rowsToSync = (this.data as any)[t === 'activity_logs' ? 'activity_logs' : t];
+        if (rowsToSync && rowsToSync.length > 0) {
+          await this.syncTableToSupabase(t, rowsToSync);
         }
       }
     }
