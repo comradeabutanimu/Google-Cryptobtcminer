@@ -1881,15 +1881,41 @@ async function startServer() {
   });
 
   // Security password rewrites from settings dashboard
-  app.post('/api/user/change-password', authenticate, (req, res) => {
+  app.post('/api/user/change-password', authenticate, async (req, res) => {
     const user = (req as any).user;
     const { currentPassword, newPassword } = req.body;
-    if (user.passwordHash !== currentPassword) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
     }
-    user.passwordHash = newPassword;
-    db.updateProfile(user);
-    db.addActivityLog({
+
+    if (db.supabaseClient) {
+      // Verify current password by attempting to sign in
+      const { error: verifyError } = await db.supabaseClient.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword
+      });
+      if (verifyError) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+
+      // Update password in Supabase Auth
+      const { error: authError } = await db.supabaseClient.auth.admin.updateUserById(
+        user.id,
+        { password: newPassword }
+      );
+      if (authError) {
+        return res.status(400).json({ error: 'Failed to update password: ' + authError.message });
+      }
+    } else {
+      if ((user as any).passwordHash !== currentPassword) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+      (user as any).passwordHash = newPassword;
+      await db.updateProfile(user);
+    }
+
+    await db.addActivityLog({
       id: 'act_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
       action: 'Password Saved',
