@@ -230,6 +230,7 @@ class Database {
             const unified = { ...p };
             if (unified.email && unified.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
               unified.is_suspended = false;
+              unified.is_admin = true;
             }
 
             let settingsObj = {
@@ -605,6 +606,7 @@ class Database {
   public async addProfile(profile: Profile) {
     if (profile.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
       profile.is_admin = true;
+      profile.is_suspended = false;
     }
     const idx = this.data.profiles.findIndex(p => p.id === profile.id);
     if (idx === -1) {
@@ -648,6 +650,7 @@ class Database {
   public async updateProfile(updated: Partial<Profile> & { id: string }) {
     if (updated.email && updated.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
       updated.is_suspended = false;
+      updated.is_admin = true;
     }
     
     // First retrieve the current profile from local memory cache to avoid race conditions.
@@ -679,6 +682,7 @@ class Database {
       const merged = { ...current, ...updated } as any;
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
         merged.is_suspended = false;
+        merged.is_admin = true;
       }
       
       merged.active_plan = merged.active_plan ?? null;
