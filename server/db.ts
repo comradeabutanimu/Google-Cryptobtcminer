@@ -251,9 +251,24 @@ class Database {
             const settingsAsAny = settingsObj as any;
             return {
               ...unified,
+              btc_balance: unified.btc_balance ?? settingsAsAny.btc_balance ?? 0,
+              usd_balance: unified.usd_balance ?? settingsAsAny.usd_balance ?? 0,
               locked_capital: unified.locked_capital ?? settingsAsAny.locked_capital ?? 0,
               deposit_usd_value: unified.deposit_usd_value ?? settingsAsAny.deposit_usd_value ?? 0,
-              usd_balance: unified.usd_balance ?? settingsAsAny.usd_balance ?? 0,
+              active_plan: unified.active_plan ?? settingsAsAny.active_plan ?? null,
+              active_plan_investment: unified.active_plan_investment ?? settingsAsAny.active_plan_investment ?? 0,
+              active_plan_rate: unified.active_plan_rate ?? settingsAsAny.active_plan_rate ?? 0,
+              active_plan_hash_rate: unified.active_plan_hash_rate ?? settingsAsAny.active_plan_hash_rate ?? 0,
+              plan_activated_at: unified.plan_activated_at ?? settingsAsAny.plan_activated_at ?? null,
+              plan_expires_at: unified.plan_expires_at ?? settingsAsAny.plan_expires_at ?? null,
+              last_mining_at: unified.last_mining_at ?? settingsAsAny.last_mining_at ?? null,
+              passwordHash: unified.passwordHash ?? unified.password_hash ?? unified.passwordhash ?? settingsAsAny.passwordHash ?? null,
+              two_factor_enabled: unified.two_factor_enabled ?? settingsAsAny.two_factor_enabled ?? false,
+              two_factor_secret: unified.two_factor_secret ?? settingsAsAny.two_factor_secret ?? null,
+              pin: unified.pin ?? settingsAsAny.pin ?? null,
+              withdrawal_address: unified.withdrawal_address ?? settingsAsAny.withdrawal_address ?? null,
+              kyc_status: unified.kyc_status ?? settingsAsAny.kyc_status ?? null,
+              kyc_documents: unified.kyc_documents ?? settingsAsAny.kyc_documents ?? null,
               settings: settingsObj
             } as any;
           });
@@ -321,6 +336,48 @@ class Database {
         if (!annError && anns) {
           this.availableTables.add('announcements');
           this.data.announcements = anns;
+        }
+
+        // Auto-realign profile active plans from confirmed deposits or settings if missing
+        for (const p of this.data.profiles) {
+          const userConfirmedDeposits = this.data.deposits
+            .filter(d => d.user_id === p.id && d.status === 'confirmed')
+            .reduce((sum, d) => sum + (Number(d.amount_usd) || 0), 0);
+
+          const currentLocked = Number(p.locked_capital || p.deposit_usd_value || 0);
+          const totalCapital = Math.max(currentLocked, userConfirmedDeposits);
+
+          if (totalCapital > 0) {
+            p.locked_capital = totalCapital;
+            p.deposit_usd_value = totalCapital;
+
+            if (!p.active_plan) {
+              if (totalCapital >= 50000) {
+                p.active_plan = 'plan_vip';
+                p.active_plan_rate = 0.05;
+                p.active_plan_hash_rate = Math.round(totalCapital / 3);
+              } else if (totalCapital >= 10000) {
+                p.active_plan = 'plan_pro';
+                p.active_plan_rate = 0.03;
+                p.active_plan_hash_rate = Math.round(totalCapital / 3);
+              } else {
+                p.active_plan = 'plan_starter';
+                p.active_plan_rate = 0.015;
+                p.active_plan_hash_rate = Math.round(totalCapital);
+              }
+              p.active_plan_investment = totalCapital;
+              if (!p.plan_activated_at) {
+                p.plan_activated_at = new Date().toISOString();
+              }
+              if (!p.plan_expires_at) {
+                const durationDays = p.active_plan === 'plan_starter' ? 60 : p.active_plan === 'plan_pro' ? 90 : 180;
+                p.plan_expires_at = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+              }
+              if (!p.last_mining_at) {
+                p.last_mining_at = p.plan_activated_at;
+              }
+            }
+          }
         }
 
         await this.ensureSuperAdmin(client);
@@ -608,6 +665,36 @@ class Database {
       profile.is_admin = true;
       profile.is_suspended = false;
     }
+    let settingsObj: any = {};
+    if (profile.settings) {
+      try {
+        settingsObj = typeof profile.settings === 'string' ? JSON.parse(profile.settings) : profile.settings;
+      } catch (e) {}
+    }
+    const pAny = profile as any;
+    settingsObj = {
+      ...settingsObj,
+      btc_balance: profile.btc_balance ?? 0,
+      usd_balance: pAny.usd_balance ?? 0,
+      locked_capital: pAny.locked_capital ?? 0,
+      deposit_usd_value: pAny.deposit_usd_value ?? 0,
+      active_plan: profile.active_plan ?? null,
+      active_plan_investment: pAny.active_plan_investment ?? 0,
+      active_plan_rate: pAny.active_plan_rate ?? 0,
+      active_plan_hash_rate: pAny.active_plan_hash_rate ?? 0,
+      plan_activated_at: profile.plan_activated_at ?? null,
+      plan_expires_at: profile.plan_expires_at ?? null,
+      last_mining_at: profile.last_mining_at ?? null,
+      passwordHash: pAny.passwordHash || pAny.password_hash || pAny.passwordhash || null,
+      two_factor_enabled: pAny.two_factor_enabled ?? false,
+      two_factor_secret: pAny.two_factor_secret ?? null,
+      pin: pAny.pin ?? null,
+      withdrawal_address: pAny.withdrawal_address ?? null,
+      kyc_status: pAny.kyc_status ?? null,
+      kyc_documents: pAny.kyc_documents ?? null
+    };
+    profile.settings = settingsObj;
+
     const idx = this.data.profiles.findIndex(p => p.id === profile.id);
     if (idx === -1) {
       this.data.profiles.push(profile);
@@ -675,9 +762,17 @@ class Database {
         } catch (e) {}
       }
       
+      current.btc_balance = current.btc_balance ?? currentSettingsObj.btc_balance ?? 0;
       current.locked_capital = current.locked_capital ?? currentSettingsObj.locked_capital ?? 0;
       current.deposit_usd_value = current.deposit_usd_value ?? currentSettingsObj.deposit_usd_value ?? 0;
       current.usd_balance = current.usd_balance ?? currentSettingsObj.usd_balance ?? 0;
+      current.active_plan = current.active_plan ?? currentSettingsObj.active_plan ?? null;
+      current.active_plan_investment = current.active_plan_investment ?? currentSettingsObj.active_plan_investment ?? 0;
+      current.active_plan_rate = current.active_plan_rate ?? currentSettingsObj.active_plan_rate ?? 0;
+      current.active_plan_hash_rate = current.active_plan_hash_rate ?? currentSettingsObj.active_plan_hash_rate ?? 0;
+      current.plan_activated_at = current.plan_activated_at ?? currentSettingsObj.plan_activated_at ?? null;
+      current.plan_expires_at = current.plan_expires_at ?? currentSettingsObj.plan_expires_at ?? null;
+      current.last_mining_at = current.last_mining_at ?? currentSettingsObj.last_mining_at ?? null;
 
       const merged = { ...current, ...updated } as any;
       if (merged.email && merged.email.toLowerCase() === 'comradeabutanimu@gmail.com') {
@@ -703,9 +798,24 @@ class Database {
       // Pack the updated values into settings
       mergedSettingsObj = {
         ...mergedSettingsObj,
-        locked_capital: merged.locked_capital,
-        deposit_usd_value: merged.deposit_usd_value,
-        usd_balance: merged.usd_balance
+        btc_balance: merged.btc_balance ?? mergedSettingsObj.btc_balance ?? 0,
+        usd_balance: merged.usd_balance ?? mergedSettingsObj.usd_balance ?? 0,
+        locked_capital: merged.locked_capital ?? mergedSettingsObj.locked_capital ?? 0,
+        deposit_usd_value: merged.deposit_usd_value ?? mergedSettingsObj.deposit_usd_value ?? 0,
+        active_plan: merged.active_plan !== undefined ? merged.active_plan : (mergedSettingsObj.active_plan ?? null),
+        active_plan_investment: merged.active_plan_investment ?? mergedSettingsObj.active_plan_investment ?? 0,
+        active_plan_rate: merged.active_plan_rate ?? mergedSettingsObj.active_plan_rate ?? 0,
+        active_plan_hash_rate: merged.active_plan_hash_rate ?? mergedSettingsObj.active_plan_hash_rate ?? 0,
+        plan_activated_at: merged.plan_activated_at !== undefined ? merged.plan_activated_at : (mergedSettingsObj.plan_activated_at ?? null),
+        plan_expires_at: merged.plan_expires_at !== undefined ? merged.plan_expires_at : (mergedSettingsObj.plan_expires_at ?? null),
+        last_mining_at: merged.last_mining_at !== undefined ? merged.last_mining_at : (mergedSettingsObj.last_mining_at ?? null),
+        passwordHash: merged.passwordHash || merged.password_hash || merged.passwordhash || mergedSettingsObj.passwordHash || null,
+        two_factor_enabled: merged.two_factor_enabled ?? mergedSettingsObj.two_factor_enabled ?? false,
+        two_factor_secret: merged.two_factor_secret ?? mergedSettingsObj.two_factor_secret ?? null,
+        pin: merged.pin ?? mergedSettingsObj.pin ?? null,
+        withdrawal_address: merged.withdrawal_address ?? mergedSettingsObj.withdrawal_address ?? null,
+        kyc_status: merged.kyc_status ?? mergedSettingsObj.kyc_status ?? null,
+        kyc_documents: merged.kyc_documents ?? mergedSettingsObj.kyc_documents ?? null
       };
       merged.settings = mergedSettingsObj;
 
