@@ -516,13 +516,23 @@ async function startServer() {
     user.active_plan_investment = amountUsd;
     user.active_plan_rate = rate;
     user.active_plan_hash_rate = hashRateGhs;
-    if (!user.plan_activated_at) {
-      user.plan_activated_at = new Date().toISOString();
+    
+    // Set plan activation time and full contract expiry duration
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    
+    // Reset plan_activated_at if missing or if existing expires_at is outdated/expired
+    let startMs = user.plan_activated_at ? new Date(user.plan_activated_at).getTime() : nowMs;
+    if (isNaN(startMs) || !user.plan_expires_at || new Date(user.plan_expires_at).getTime() <= nowMs) {
+      startMs = nowMs;
+      user.plan_activated_at = nowIso;
+    } else {
+      user.plan_activated_at = new Date(startMs).toISOString();
     }
-    const startMs = new Date(user.plan_activated_at).getTime();
+    
     user.plan_expires_at = new Date(startMs + durationDays * 24 * 60 * 60 * 1000).toISOString();
     if (!user.last_mining_at) {
-      user.last_mining_at = new Date().toISOString();
+      user.last_mining_at = nowIso;
     }
     user.locked_capital = amountUsd;
     user.deposit_usd_value = amountUsd;
