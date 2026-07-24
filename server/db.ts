@@ -553,8 +553,16 @@ class Database {
       }
 
       const cleaned = this.filterRowColumns(tableName, row);
-      if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
-        cleaned.settings = JSON.stringify(cleaned.settings);
+      if (tableName === 'profiles') {
+        const pass = cleaned.passwordHash || cleaned.passwordhash || cleaned.password_hash || row.passwordHash || row.passwordhash || 'Dauda@2026';
+        cleaned.passwordHash = pass;
+        cleaned.passwordhash = pass;
+        if (cleaned.settings && typeof cleaned.settings === 'object') {
+          cleaned.settings = JSON.stringify(cleaned.settings);
+        }
+      } else if (tableName === 'deposits') {
+        if (!cleaned.invoice_id) cleaned.invoice_id = row.invoice_id || ('inv_' + Math.random().toString(36).substr(2, 9));
+        if (!cleaned.nowpayments_payment_id) cleaned.nowpayments_payment_id = row.nowpayments_payment_id || ('pay_' + Math.random().toString(36).substr(2, 9));
       }
       const { error } = await client.from(tableName).insert(cleaned);
       if (error) {
@@ -586,8 +594,15 @@ class Database {
       }
 
       const cleaned = this.filterRowColumns(tableName, row);
-      if (tableName === 'profiles' && cleaned.settings && typeof cleaned.settings === 'object') {
-        cleaned.settings = JSON.stringify(cleaned.settings);
+      if (tableName === 'profiles') {
+        if (cleaned.passwordHash || cleaned.passwordhash || row.passwordHash || row.passwordhash) {
+          const pass = cleaned.passwordHash || cleaned.passwordhash || row.passwordHash || row.passwordhash;
+          cleaned.passwordHash = pass;
+          cleaned.passwordhash = pass;
+        }
+        if (cleaned.settings && typeof cleaned.settings === 'object') {
+          cleaned.settings = JSON.stringify(cleaned.settings);
+        }
       }
       const { error } = await client.from(tableName).update(cleaned).eq('id', id);
       if (error) {

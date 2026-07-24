@@ -1017,6 +1017,8 @@ async function startServer() {
         notifyPromotions: false
       }
     };
+    (newProfile as any).passwordHash = password;
+    (newProfile as any).passwordhash = password;
 
     // Notify referrer if code match (without automatic balance credit on registration)
     if (referredBy) {
