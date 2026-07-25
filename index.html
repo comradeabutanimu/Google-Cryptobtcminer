@@ -6,58 +6,67 @@
     <link class="favicon" rel="icon" type="image/png" href="/src/assets/images/favicon_1779933297334.png" />
     <title>CryptoBTC Miner | Cloud Mining Platform</title>
     <script type="text/javascript">
-      // Suppress known third-party Tawk.to WebSocket/getForm errors in sandbox/iframe context
+      // Suppress known third-party Tawk.to WebSocket/getForm/Logger errors in sandbox/iframe context
+      function isTawkMessage(str) {
+        if (!str) return false;
+        const lower = String(str).toLowerCase();
+        return (
+          lower.includes('tawk') || 
+          lower.includes('[tawk') || 
+          lower.includes('getform') || 
+          lower.includes('socket server') || 
+          lower.includes('tawk.to')
+        );
+      }
+
       window.addEventListener('error', function(e) {
-        if (e && e.message) {
-          const msg = String(e.message).toLowerCase();
-          const url = String(e.filename || '').toLowerCase();
-          if (
-            msg.includes('tawk') || 
-            msg.includes('getform') || 
-            msg.includes('socket server') || 
-            url.includes('tawk.to')
-          ) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) {
-              e.stopImmediatePropagation();
-            }
-            return true;
+        if (e && (isTawkMessage(e.message) || isTawkMessage(e.filename))) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) {
+            e.stopImmediatePropagation();
           }
+          return true;
         }
       }, true);
 
       window.addEventListener('unhandledrejection', function(e) {
-        if (e && e.reason) {
-          const msg = String(e.reason.message || e.reason).toLowerCase();
-          if (
-            msg.includes('tawk') || 
-            msg.includes('getform') || 
-            msg.includes('socket server')
-          ) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) {
-              e.stopImmediatePropagation();
-            }
-            return true;
+        if (e && e.reason && isTawkMessage(e.reason.message || e.reason)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) {
+            e.stopImmediatePropagation();
           }
+          return true;
         }
       }, true);
 
-      // Suppress [Tawk/Form]: undefined undefined console errors
+      // Suppress [Tawk/Logger], [Tawk/Form], etc console warnings and errors
       const originalConsoleError = console.error;
       console.error = function(...args) {
         const argStr = args.map(arg => String(arg)).join(' ');
-        if (
-          argStr.includes('[Tawk/Form]') || 
-          argStr.includes('Tawk_API') || 
-          argStr.includes('getForm') || 
-          argStr.includes('tawk.to')
-        ) {
+        if (isTawkMessage(argStr)) {
           return;
         }
         originalConsoleError.apply(console, args);
+      };
+
+      const originalConsoleWarn = console.warn;
+      console.warn = function(...args) {
+        const argStr = args.map(arg => String(arg)).join(' ');
+        if (isTawkMessage(argStr)) {
+          return;
+        }
+        originalConsoleWarn.apply(console, args);
+      };
+
+      const originalConsoleLog = console.log;
+      console.log = function(...args) {
+        const argStr = args.map(arg => String(arg)).join(' ');
+        if (argStr.startsWith('[Tawk/') || isTawkMessage(argStr)) {
+          return;
+        }
+        originalConsoleLog.apply(console, args);
       };
     </script>
   </head>

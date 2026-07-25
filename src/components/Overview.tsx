@@ -65,19 +65,14 @@ export default function Overview({
 
     // Resolve live daily earning rate based on computed cloud plan settings
     let dailyEarn = 0;
+    const btcUsd = btcPrice?.btc_usd || 68420.0;
+
     if (profile.active_plan_investment && profile.active_plan_rate) {
-      const btcUsd = btcPrice?.btc_usd || 68420.0;
       dailyEarn = (profile.active_plan_investment * profile.active_plan_rate) / btcUsd;
     } else {
-      const activePlanObj = plans?.find(p => p.id === profile.active_plan);
-      if (activePlanObj) {
-        dailyEarn = activePlanObj.daily_earn_btc;
-      } else {
-        // fallback matching default configuration values
-        if (profile.active_plan === 'plan_starter') dailyEarn = 0.00024359;
-        else if (profile.active_plan === 'plan_pro') dailyEarn = 0.00632479;
-        else if (profile.active_plan === 'plan_vip') dailyEarn = 0.03846154;
-      }
+      if (profile.active_plan === 'plan_starter') dailyEarn = 7.50 / btcUsd; // $500 * 1.5% = $7.50 USD / day
+      else if (profile.active_plan === 'plan_pro') dailyEarn = 300.00 / btcUsd; // $10,000 * 3.0% = $300.00 USD / day
+      else if (profile.active_plan === 'plan_vip') dailyEarn = 2500.00 / btcUsd; // $50,000 * 5.0% = $2,500.00 USD / day
     }
 
     if (dailyEarn <= 0) {

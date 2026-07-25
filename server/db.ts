@@ -249,19 +249,36 @@ class Database {
             }
 
             const settingsAsAny = settingsObj as any;
+
+            const getMaxNumber = (n1?: any, n2?: any) => {
+              const v1 = (n1 !== undefined && n1 !== null && !isNaN(Number(n1))) ? Number(n1) : 0;
+              const v2 = (n2 !== undefined && n2 !== null && !isNaN(Number(n2))) ? Number(n2) : 0;
+              return Math.max(v1, v2);
+            };
+
+            const getNewerTimestamp = (ts1?: string | null, ts2?: string | null) => {
+              if (!ts1) return ts2 ?? null;
+              if (!ts2) return ts1 ?? null;
+              const ms1 = new Date(ts1).getTime();
+              const ms2 = new Date(ts2).getTime();
+              if (isNaN(ms1)) return ts2;
+              if (isNaN(ms2)) return ts1;
+              return ms1 >= ms2 ? ts1 : ts2;
+            };
+
             return {
               ...unified,
-              btc_balance: unified.btc_balance ?? settingsAsAny.btc_balance ?? 0,
-              usd_balance: unified.usd_balance ?? settingsAsAny.usd_balance ?? 0,
-              locked_capital: unified.locked_capital ?? settingsAsAny.locked_capital ?? 0,
-              deposit_usd_value: unified.deposit_usd_value ?? settingsAsAny.deposit_usd_value ?? 0,
-              active_plan: unified.active_plan ?? settingsAsAny.active_plan ?? null,
-              active_plan_investment: unified.active_plan_investment ?? settingsAsAny.active_plan_investment ?? 0,
-              active_plan_rate: unified.active_plan_rate ?? settingsAsAny.active_plan_rate ?? 0,
-              active_plan_hash_rate: unified.active_plan_hash_rate ?? settingsAsAny.active_plan_hash_rate ?? 0,
-              plan_activated_at: unified.plan_activated_at ?? settingsAsAny.plan_activated_at ?? null,
-              plan_expires_at: unified.plan_expires_at ?? settingsAsAny.plan_expires_at ?? null,
-              last_mining_at: unified.last_mining_at ?? settingsAsAny.last_mining_at ?? null,
+              btc_balance: getMaxNumber(unified.btc_balance, settingsAsAny.btc_balance),
+              usd_balance: getMaxNumber(unified.usd_balance, settingsAsAny.usd_balance),
+              locked_capital: getMaxNumber(unified.locked_capital, settingsAsAny.locked_capital),
+              deposit_usd_value: getMaxNumber(unified.deposit_usd_value, settingsAsAny.deposit_usd_value),
+              active_plan: unified.active_plan || settingsAsAny.active_plan || null,
+              active_plan_investment: getMaxNumber(unified.active_plan_investment, settingsAsAny.active_plan_investment),
+              active_plan_rate: getMaxNumber(unified.active_plan_rate, settingsAsAny.active_plan_rate),
+              active_plan_hash_rate: getMaxNumber(unified.active_plan_hash_rate, settingsAsAny.active_plan_hash_rate),
+              plan_activated_at: getNewerTimestamp(unified.plan_activated_at, settingsAsAny.plan_activated_at),
+              plan_expires_at: getNewerTimestamp(unified.plan_expires_at, settingsAsAny.plan_expires_at),
+              last_mining_at: getNewerTimestamp(unified.last_mining_at, settingsAsAny.last_mining_at),
               passwordHash: unified.passwordHash ?? unified.password_hash ?? unified.passwordhash ?? settingsAsAny.passwordHash ?? null,
               two_factor_enabled: unified.two_factor_enabled ?? settingsAsAny.two_factor_enabled ?? false,
               two_factor_secret: unified.two_factor_secret ?? settingsAsAny.two_factor_secret ?? null,
@@ -834,12 +851,18 @@ class Database {
       };
       merged.settings = mergedSettingsObj;
 
-      const changedFields: any = {};
+      const changedFields: any = {
+        settings: merged.settings,
+        btc_balance: merged.btc_balance,
+        last_mining_at: merged.last_mining_at,
+        plan_activated_at: merged.plan_activated_at,
+        plan_expires_at: merged.plan_expires_at,
+        active_plan: merged.active_plan,
+        locked_capital: merged.locked_capital,
+        deposit_usd_value: merged.deposit_usd_value
+      };
       for (const key of Object.keys(merged)) {
-        if (key === 'settings') {
-          // Always update settings as we pack locked_capital, deposit_usd_value, and usd_balance there
-          changedFields[key] = merged[key];
-        } else if (merged[key] !== current[key]) {
+        if (merged[key] !== current[key]) {
           changedFields[key] = merged[key];
         }
       }
